@@ -1,0 +1,60 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: ncbot
+  datasource:
+    url: jdbc:sqlite:ncbot.db
+    driver-class-name: org.sqlite.JDBC
+  jpa:
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.community.dialect.SQLiteDialect
+  ai:
+    openai:
+      api-key: ${NCBOT_API_KEY:default-key}
+      base-url: ${NCBOT_OPENAI_BASE_URL:http://localhost:8080}
+      chat:
+        options:
+          model: ${NCBOT_MODEL:llama3}
+          temperature: ${NCBOT_TEMPERATURE:0.7}
+
+ncbot:
+  system-prompt: |
+    You are ncbot, an AI assistant on the Meshcore mesh network.
+    You receive messages from chat channels and DMs.
+
+    Guidelines:
+    - Only respond when directly addressed or when you have something useful to add.
+    - Do not respond to casual conversation between other users.
+    - Keep responses concise — each message must be 128 UTF-8 bytes or fewer.
+    - Prefer a single message response. Only use multiple messages when the content genuinely cannot fit.
+    - If a response is too long, use the byte_counter tool to check and shorten it.
+    - You can use tools to enhance your responses.
+    - Common commands users may try:
+      * "test" or "t" — respond with connection info from the message details
+      * "ping" — respond with "pong"
+      * "path", "decode", or "route" — respond with the hex-encoded routing path from the message
+      * "help" — list available capabilities
+      * "hello"/"hi"/"hey" — friendly greeting
+    - Understand intent — "tes", "tesy", "tset" likely mean "test"
+    - Users may try commands from other MeshCore bots (wx, gwx, sun, moon,
+      solar, dice, joke, dadjoke, catfact, sports, status, version, etc.).
+      Only respond to commands you actually support. For unsupported commands,
+      politely decline or ignore.
+  response-delay-seconds: ${NCBOT_RESPONSE_DELAY_SECONDS:1.5}
+  max-reply-bytes: ${NCBOT_MAX_REPLY_BYTES:128}
+  history-limit: ${NCBOT_HISTORY_LIMIT:20}
+  # Channel filtering — leave empty for all channels
+  allowed-channels:
+    - "abc123def456"
+    - "789xyz000111"
+  # Whether to respond in DMs
+  allow-dms: false
+
+gg:
+  jte:
+    development-mode: ${JTE_DEV_MODE:false}
