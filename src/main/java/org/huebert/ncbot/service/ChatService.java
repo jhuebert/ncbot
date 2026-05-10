@@ -1,11 +1,5 @@
 package org.huebert.ncbot.service;
 
-import java.nio.charset.StandardCharsets;
-import java.time.Instant;
-import java.time.ZonedDateTime;
-import java.util.List;
-import java.util.stream.Collectors;
-
 import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
@@ -18,6 +12,12 @@ import org.huebert.ncbot.tool.WeatherTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
+
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.time.ZonedDateTime;
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -138,6 +138,7 @@ public class ChatService {
         String response = chatClient.prompt()
                 .system(systemPrompt)
                 .user(userMessage)
+                .messages()
                 .call()
                 .content();
 

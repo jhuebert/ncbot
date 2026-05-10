@@ -30,6 +30,7 @@ public class ChatController {
         log.info("request: {}", request);
         ChatResponse response = chatService.processMessage(request);
         log.info("response: {}", response);
+
         long delay = ncbotProperties.minimumResponseMs() - (System.currentTimeMillis() - start);
         if (delay > 0) {
             Delay.sleep(delay);

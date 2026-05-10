@@ -1,15 +1,16 @@
 package org.huebert.ncbot.config;
 
-import java.util.List;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+
+import java.util.List;
 
 @ConfigurationProperties(prefix = "ncbot")
 public record NcbotProperties(
-    String systemPrompt,
-    long minimumResponseMs,
-    int messageHistoryMinutes,
-    int maxReplyBytes,
-    List<String> allowedChannels,
-    boolean allowDms
+        String systemPrompt,
+        long minimumResponseMs,
+        int messageHistoryMinutes,
+        int maxReplyBytes,
+        List<String> allowedChannels,
+        boolean allowDms
 ) {
 }

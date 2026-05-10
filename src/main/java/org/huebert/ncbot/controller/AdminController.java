@@ -1,10 +1,5 @@
 package org.huebert.ncbot.controller;
 
-import java.time.Duration;
-import java.time.Instant;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.entity.ChatMessage;
 import org.huebert.ncbot.repository.ChatMessageRepository;
@@ -14,6 +9,12 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+
+import java.time.Duration;
+import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 @Controller
 @RequestMapping("/admin")
@@ -33,7 +34,7 @@ public class AdminController {
     public String dashboard(Model model) {
         long totalMessages = messageRepository.count();
         long channelMessages = messageRepository.findAll()
-            .stream().filter(m -> Boolean.FALSE.equals(m.getIsDm())).count();
+                .stream().filter(m -> Boolean.FALSE.equals(m.getIsDm())).count();
         long dmMessages = totalMessages - channelMessages;
 
         Map<String, Long> channelStats = new LinkedHashMap<>();
@@ -65,7 +66,7 @@ public class AdminController {
                            @RequestParam(defaultValue = "0") int page,
                            @RequestParam(defaultValue = "25") int size) {
         List<ChatMessage> messages = messageRepository.findAll(
-            PageRequest.of(page, size)).getContent();
+                PageRequest.of(page, size)).getContent();
         long totalPages = messageRepository.count() / size + 1;
 
         model.addAttribute("messages", messages);

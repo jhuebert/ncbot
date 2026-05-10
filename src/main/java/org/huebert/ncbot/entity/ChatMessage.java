@@ -1,21 +1,15 @@
 package org.huebert.ncbot.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.Table;
-import java.time.Instant;
-
+import jakarta.persistence.*;
 import lombok.*;
+
+import java.time.Instant;
 
 @Builder(toBuilder = true)
 @Entity
 @Table(name = "chat_messages", indexes = {
-    @Index(name = "idx_channel_created", columnList = "channel_key, created_at"),
-    @Index(name = "idx_dm_sender_created", columnList = "is_dm, sender_key, created_at")
+        @Index(name = "idx_channel_created", columnList = "channel_key, created_at"),
+        @Index(name = "idx_dm_sender_created", columnList = "is_dm, sender_key, created_at")
 })
 @Getter
 @Setter

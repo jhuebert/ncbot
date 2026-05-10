@@ -1,9 +1,9 @@
 package org.huebert.ncbot;
 
+import org.huebert.ncbot.config.NcbotProperties;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
-import org.huebert.ncbot.config.NcbotProperties;
 
 @SpringBootApplication
 @EnableConfigurationProperties(NcbotProperties.class)
