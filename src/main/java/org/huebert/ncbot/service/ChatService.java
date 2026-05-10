@@ -2,6 +2,7 @@ package org.huebert.ncbot.service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -112,19 +113,6 @@ public class ChatService {
                 .messageText(response)
                 .isOutgoing(true)
                 .build();
-//        ChatMessage system = ChatMessage.builder()
-//                .channelName(request.channelName())
-//                .createdAt(Instant.now())
-//                .path(request.path())
-//                .channelKey(request.channelKey())
-//                .isDm(request.isDm())
-//                .messageText(response)
-//                .isOutgoing(request.isOutgoing())
-//                .pathBytesPerHop(request.pathBytesPerHop())
-//                .senderTimestamp(Instant.now().toEpochMilli())
-//                .senderKey(request.senderKey())
-//                .senderName("ncbot")
-//                .build();
         messageRepository.saveAll(List.of(user, system));
     }
 
@@ -132,11 +120,13 @@ public class ChatService {
         String userMessage = buildUserMessage(request);
         log.info("userMessage: {}", userMessage);
 
+        Instant since = ZonedDateTime.now().minusMinutes(properties.messageHistoryMinutes()).toInstant();
+
         List<ChatMessage> ms;
         if (Boolean.TRUE.equals(request.isDm())) {
-            ms = messageRepository.findAllByIsDmAndSenderKeyOrderByCreatedAtAsc(true, request.senderKey());
+            ms = messageRepository.findLatestDms(request.senderKey(), since);
         } else {
-            ms = messageRepository.findAllByChannelKeyOrderByCreatedAtAsc(request.channelKey());
+            ms = messageRepository.findLatestChannelMessages(request.channelKey(), since);
         }
         String messages = ms.stream()
                 .map(this::buildUserMessage)

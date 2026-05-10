@@ -13,7 +13,7 @@
                 <tbody>
                     <tr>
                         <td>Response Delay</td>
-                        <td>${properties.responseDelaySeconds()} seconds</td>
+                        <td>${properties.minimumResponseMs()} ms</td>
                     </tr>
                     <tr>
                         <td>Max Reply Bytes</td>
@@ -21,7 +21,7 @@
                     </tr>
                     <tr>
                         <td>History Limit</td>
-                        <td>${properties.historyLimit()}</td>
+                        <td>${properties.messageHistoryMinutes()} minutes</td>
                     </tr>
                 </tbody>
             </table>

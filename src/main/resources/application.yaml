@@ -28,15 +28,11 @@ ncbot:
     Your entire response should be no more than 128 UTF-8 bytes in length.
     Do not prefix your response with your name.
     Use the available tools to help you.
-#    This should be minimum response delay
-  response-delay-seconds: ${NCBOT_RESPONSE_DELAY_SECONDS:0.0}
-#  It should also have a maximum response time and a string to return if it didn't respond quickly enough
+  message-history-minutes: ${NCBOT_MESSAGE_HISTORY_MINUTES:30}
+  minimum-response-ms: ${NCBOT_MINIMUM_RESPONSE_MS:0}
   max-reply-bytes: ${NCBOT_MAX_REPLY_BYTES:128}
-  history-limit: ${NCBOT_HISTORY_LIMIT:20}
-  # Channel filtering — leave empty for all channels
   allowed-channels:
     - "#ncbot"
-  # Whether to respond in DMs
   allow-dms: true
 
 gg:
