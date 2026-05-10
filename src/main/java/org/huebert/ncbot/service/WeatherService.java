@@ -1,5 +1,6 @@
 package org.huebert.ncbot.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -8,6 +9,7 @@ import org.springframework.web.client.RestClient;
 import java.util.Map;
 import java.util.Optional;
 
+@Slf4j
 @Service
 public class WeatherService {
 
@@ -27,19 +29,23 @@ public class WeatherService {
             .uri("https://geocoding-api.open-meteo.com/v1/search?name={query}&count=1", location)
             .retrieve()
             .toEntity(new ParameterizedTypeReference<Map<String, Object>>() {});
+        log.info("geoResponse: {}", geoResponse);
 
         if (geoResponse.getStatusCode() != HttpStatus.OK) {
+            log.error("error encountered during geocoding: {}", geoResponse);
             return Optional.empty();
         }
 
         Map<String, Object> geoBody = geoResponse.getBody();
         if (geoBody == null || !geoBody.containsKey("results")) {
+            log.error("empty geocoding body");
             return Optional.empty();
         }
 
         @SuppressWarnings("unchecked")
         var results = (java.util.List<Map<String, Object>>) geoBody.get("results");
         if (results == null || results.isEmpty()) {
+            log.error("empty geocoding results");
             return Optional.empty();
         }
 
@@ -48,7 +54,6 @@ public class WeatherService {
         double longitude = ((Number) firstResult.get("longitude")).doubleValue();
         String name = (String) firstResult.get("name");
 
-        // Step 2: Fetch weather
         ResponseEntity<Map<String, Object>> weatherResponse = restClient.get()
             .uri("https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}"
                 + "&current=temperature_2m,relative_humidity_2m,apparent_temperature,"
@@ -58,11 +63,13 @@ public class WeatherService {
             .toEntity(new ParameterizedTypeReference<Map<String, Object>>() {});
 
         if (weatherResponse.getStatusCode() != HttpStatus.OK) {
+            log.error("error encountered during weather fetch: {}", weatherResponse);
             return Optional.empty();
         }
 
         Map<String, Object> weatherBody = weatherResponse.getBody();
         if (weatherBody == null || !weatherBody.containsKey("current")) {
+            log.error("empty weather body");
             return Optional.empty();
         }
 

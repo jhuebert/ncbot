@@ -13,6 +13,7 @@ import org.huebert.ncbot.entity.ChatMessage;
 import org.huebert.ncbot.repository.ChatMessageRepository;
 import org.huebert.ncbot.tool.CountBytesTool;
 import org.huebert.ncbot.tool.CurrentTimeTool;
+import org.huebert.ncbot.tool.WeatherTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
@@ -46,12 +47,13 @@ public class ChatService {
                        ChatMessageRepository messageRepository,
                        NcbotProperties properties,
                        CountBytesTool countBytesTool,
+                       WeatherTool weatherTool,
                        CurrentTimeTool currentTimeTool
     ) {
         this.messageRepository = messageRepository;
         this.properties = properties;
         this.chatClient = ChatClient.builder(chatModel)
-                .defaultTools(currentTimeTool, countBytesTool)
+                .defaultTools(currentTimeTool, countBytesTool, weatherTool)
                 .build();
     }
 
