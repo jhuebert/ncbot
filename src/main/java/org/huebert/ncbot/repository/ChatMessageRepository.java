@@ -11,7 +11,11 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
 
     List<ChatMessage> findAllByChannelKeyOrderByCreatedAtDesc(String channelKey, Pageable pageable);
 
+    List<ChatMessage> findAllByChannelKeyOrderByCreatedAtAsc(String channelKey);
+
     List<ChatMessage> findAllByIsDmAndSenderKeyOrderByCreatedAtDesc(Boolean isDm, String senderKey, Pageable pageable);
+
+    List<ChatMessage> findAllByIsDmAndSenderKeyOrderByCreatedAtAsc(Boolean isDm, String senderKey);
 
     long countByChannelKey(String channelKey);
 

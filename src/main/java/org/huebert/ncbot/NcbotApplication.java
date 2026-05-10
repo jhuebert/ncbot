@@ -9,8 +9,8 @@ import org.huebert.ncbot.config.NcbotProperties;
 @EnableConfigurationProperties(NcbotProperties.class)
 public class NcbotApplication {
 
-	public static void main(String[] args) {
-		SpringApplication.run(NcbotApplication.class, args);
-	}
+    static void main(String[] args) {
+        SpringApplication.run(NcbotApplication.class, args);
+    }
 
 }

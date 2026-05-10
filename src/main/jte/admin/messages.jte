@@ -37,15 +37,15 @@
                 <tbody>
                 @for(ChatMessage msg : messages)
                     <tr>
-                        <td class="mono">${msg.getCreatedAt().toString().substring(11, 19)}</td>
+                        <td class="mono">${msg.getCreatedAt().toString()}</td>
                         <td>${msg.getSenderName() != null ? msg.getSenderName() : "(none)"}</td>
                         <td>
                             <span class="badge ${msg.getIsDm() ? "badge-dm" : "badge-channel"}">
                                 ${msg.getIsDm() ? "DM" : "Channel"}
                             </span>
                         </td>
-                        <td class="mono">${msg.getChannelKey() != null ? msg.getChannelKey() : (msg.getSenderKey() != null ? msg.getSenderKey().substring(0, Math.min(16, msg.getSenderKey().length())) : "-")}</td>
-                        <td class="message-text">${msg.getMessageText() != null && msg.getMessageText().length() > 80 ? msg.getMessageText().substring(0, 80) + "..." : (msg.getMessageText() != null ? msg.getMessageText() : "")}</td>
+                        <td class="mono">${msg.getChannelKey() != null ? msg.getChannelKey().toUpperCase() : (msg.getSenderKey() != null ? msg.getSenderKey().toUpperCase() : "-")}</td>
+                        <td class="message-text">${msg.getMessageText() != null ? msg.getMessageText() : ""}</td>
                     </tr>
                 @endfor
                 </tbody>

@@ -5,7 +5,7 @@ import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
-@Component
+//@Component
 public class WeatherTool {
 
     private final WeatherService weatherService;
@@ -14,7 +14,7 @@ public class WeatherTool {
         this.weatherService = weatherService;
     }
 
-    @Tool(description = "Get current weather conditions for a location")
+//    @Tool(description = "Get current weather conditions for a location")
     public String getWeather(@ToolParam(description = "City name, coordinates, or zip code") String location) {
         return weatherService.getWeather(location)
             .orElse("Could not find weather for: " + location);

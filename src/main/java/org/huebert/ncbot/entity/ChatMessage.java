@@ -8,10 +8,10 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import java.time.Instant;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 
+import lombok.*;
+
+@Builder(toBuilder = true)
 @Entity
 @Table(name = "chat_messages", indexes = {
     @Index(name = "idx_channel_created", columnList = "channel_key, created_at"),
@@ -20,6 +20,7 @@ import lombok.Setter;
 @Getter
 @Setter
 @NoArgsConstructor
+@AllArgsConstructor
 public class ChatMessage {
 
     @Id
@@ -73,6 +74,5 @@ public class ChatMessage {
         this.path = path;
         this.isOutgoing = isOutgoing;
         this.pathBytesPerHop = pathBytesPerHop;
-        this.createdAt = Instant.now();
     }
 }

@@ -1,173 +1,182 @@
 package org.huebert.ncbot.service;
 
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
+import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.dto.ChatResponse;
 import org.huebert.ncbot.entity.ChatMessage;
 import org.huebert.ncbot.repository.ChatMessageRepository;
-import org.huebert.ncbot.tool.MessageHistoryTool;
-import org.huebert.ncbot.util.MessageSplitter;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.huebert.ncbot.tool.CountBytesTool;
+import org.huebert.ncbot.tool.CurrentTimeTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
-import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 public class ChatService {
 
-    private static final Logger log = LoggerFactory.getLogger(ChatService.class);
+    private static final ChatResponse EMPTY_RESPONSE = new ChatResponse(List.of());
+
+    private static final String SYSTEM_PROMPT = """
+            %s
+            Message History:
+            
+            %s
+            """;
+
+    private static final String CONDENSE_PROMPT = """
+            Your task is to condense the user message so that it is no more than %d UTF-8 bytes.
+            It is currently %d bytes long.
+            The user message is in response to: %s
+            """;
+
+    private static final String MESSAGE_FORMAT = "%s: %s";
 
     private final ChatClient chatClient;
     private final ChatMessageRepository messageRepository;
     private final NcbotProperties properties;
-    private final MessageHistoryTool messageHistoryTool;
 
     public ChatService(ChatModel chatModel,
                        ChatMessageRepository messageRepository,
                        NcbotProperties properties,
-                       MessageHistoryTool messageHistoryTool,
-                       List<ToolCallbackProvider> toolCallbackProviders) {
+                       CountBytesTool countBytesTool,
+                       CurrentTimeTool currentTimeTool
+    ) {
         this.messageRepository = messageRepository;
         this.properties = properties;
-        this.messageHistoryTool = messageHistoryTool;
-
         this.chatClient = ChatClient.builder(chatModel)
-            .defaultSystem(properties.systemPrompt())
-            .defaultToolCallbacks(toolCallbackProviders.toArray(new ToolCallbackProvider[0]))
-            .build();
+                .defaultTools(currentTimeTool, countBytesTool)
+                .build();
     }
 
     public ChatResponse processMessage(ChatRequest request) {
-        // Phase 1: Persist the message
-        ChatMessage entity = new ChatMessage(
-            request.senderName(), request.senderKey(), request.messageText(),
-            request.isDm(), request.channelKey(), request.channelName(),
-            request.senderTimestamp(), request.path(), request.isOutgoing(),
-            request.pathBytesPerHop()
-        );
-        messageRepository.save(entity);
+        log.info("processMessage: {}", request);
 
-        // Phase 2: Filter — skip outgoing messages
         if (Boolean.TRUE.equals(request.isOutgoing())) {
-            log.debug("Skipping outgoing message from {}", request.senderName());
-            return new ChatResponse(List.of());
+            log.info("Skipping outgoing message from {}", request.senderName());
+            return EMPTY_RESPONSE;
         }
 
-        // Phase 3: DM check
         if (Boolean.TRUE.equals(request.isDm())) {
             if (!properties.allowDms()) {
-                log.debug("Skipping DM — DMs not allowed");
-                return new ChatResponse(List.of());
+                log.info("Skipping DM — DMs not allowed");
+                return EMPTY_RESPONSE;
             }
         }
 
-        // Phase 4: Channel check
         if (Boolean.FALSE.equals(request.isDm())) {
             List<String> allowed = properties.allowedChannels();
             if (allowed != null && !allowed.isEmpty()) {
-                if (request.channelKey() == null || !allowed.contains(request.channelKey())) {
-                    log.debug("Skipping channel {} — not in allowed list", request.channelKey());
-                    return new ChatResponse(List.of());
+                if (request.channelName() == null || !allowed.contains(request.channelName())) {
+                    log.info("Skipping channel {} — not in allowed list", request.channelName());
+                    return EMPTY_RESPONSE;
                 }
             }
         }
 
-        // Phase 5: Apply configurable delay
-        double delay = properties.responseDelaySeconds();
-        if (delay > 0) {
-            try {
-                TimeUnit.SECONDS.sleep((long) delay);
-                if (delay % 1 > 0) {
-                    Thread.sleep((long) ((delay % 1) * 1000));
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("Interrupted during response delay");
-                return new ChatResponse(List.of());
-            }
-        }
-
-        // Phase 6: Build context and call AI
         try {
-            return callAi(request);
+            String response = invokeModel(request);
+            saveInteraction(request, response);
+            log.info("processMessage result: {}", response);
+            return new ChatResponse(List.of(response));
         } catch (Exception e) {
             log.error("Error processing message: {}", e.getMessage(), e);
-            return new ChatResponse(List.of());
+            return EMPTY_RESPONSE;
         }
     }
 
-    private ChatResponse callAi(ChatRequest request) {
-        // Set context for message history tool
-        messageHistoryTool.setContext(request.channelKey(), request.isDm(), request.senderKey());
+    private void saveInteraction(ChatRequest request, String response) {
+        ChatMessage user = ChatMessage.builder()
+                .channelName(request.channelName())
+                .createdAt(Instant.now())
+                .path(request.path())
+                .channelKey(request.channelKey())
+                .isDm(request.isDm())
+                .messageText(request.messageText())
+                .isOutgoing(request.isOutgoing())
+                .pathBytesPerHop(request.pathBytesPerHop())
+                .senderTimestamp(request.senderTimestamp())
+                .senderKey(request.senderKey())
+                .senderName(request.senderName())
+                .build();
+        ChatMessage system = user.toBuilder()
+                .senderName("ncbot")
+                .messageText(response)
+                .isOutgoing(true)
+                .build();
+//        ChatMessage system = ChatMessage.builder()
+//                .channelName(request.channelName())
+//                .createdAt(Instant.now())
+//                .path(request.path())
+//                .channelKey(request.channelKey())
+//                .isDm(request.isDm())
+//                .messageText(response)
+//                .isOutgoing(request.isOutgoing())
+//                .pathBytesPerHop(request.pathBytesPerHop())
+//                .senderTimestamp(Instant.now().toEpochMilli())
+//                .senderKey(request.senderKey())
+//                .senderName("ncbot")
+//                .build();
+        messageRepository.saveAll(List.of(user, system));
+    }
 
-        try {
-            // Build system prompt (use override if provided)
-            String systemPrompt = request.systemPrompt() != null
-                ? request.systemPrompt()
-                : properties.systemPrompt();
+    private String invokeModel(ChatRequest request) {
+        String userMessage = buildUserMessage(request);
+        log.info("userMessage: {}", userMessage);
 
-            // Build user message with message details for context
-            String userMessage = buildUserMessage(request);
+        List<ChatMessage> ms;
+        if (Boolean.TRUE.equals(request.isDm())) {
+            ms = messageRepository.findAllByIsDmAndSenderKeyOrderByCreatedAtAsc(true, request.senderKey());
+        } else {
+            ms = messageRepository.findAllByChannelKeyOrderByCreatedAtAsc(request.channelKey());
+        }
+        String messages = ms.stream()
+                .map(this::buildUserMessage)
+                .collect(Collectors.joining("\n"));
 
-            // Call AI with tools
-            String response = chatClient.prompt()
+        String systemPrompt = String.format(SYSTEM_PROMPT, properties.systemPrompt(), messages);
+        log.info("systemPrompt: {}", systemPrompt);
+
+        String response = chatClient.prompt()
                 .system(systemPrompt)
                 .user(userMessage)
                 .call()
                 .content();
 
-            if (response == null || response.isBlank()) {
-                return new ChatResponse(List.of());
-            }
-
-            // Enforce byte limit and split
-            List<String> replies = ensureByteLimit(response);
-            return new ChatResponse(replies);
-        } finally {
-            messageHistoryTool.clearContext();
-        }
+        return ensureByteLimit(userMessage, response);
     }
 
     private String buildUserMessage(ChatRequest request) {
-        StringBuilder sb = new StringBuilder();
-        sb.append(request.messageText());
-
-        // Add context about the message for the AI
-        sb.append("\n\n<Message details>");
-        if (request.senderName() != null) {
-            sb.append("\nSender: ").append(request.senderName());
-        }
-        if (request.channelName() != null) {
-            sb.append("\nChannel: ").append(request.channelName());
-        }
-        if (request.path() != null) {
-            sb.append("\nPath: ").append(request.path());
-        }
-        if (request.pathBytesPerHop() != null) {
-            sb.append("\nPath bytes per hop: ").append(request.pathBytesPerHop());
-        }
-        if (request.isDm() != null) {
-            sb.append("\nType: ").append(Boolean.TRUE.equals(request.isDm()) ? "DM" : "Channel");
-        }
-        sb.append("\n</Message details>");
-
-        return sb.toString();
+        return String.format(MESSAGE_FORMAT, request.senderName(), request.messageText());
     }
 
-    private List<String> ensureByteLimit(String text) {
-        int maxBytes = properties.maxReplyBytes();
-        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+    private String buildUserMessage(ChatMessage message) {
+        return String.format(MESSAGE_FORMAT, message.getSenderName(), message.getMessageText());
+    }
 
-        if (bytes.length <= maxBytes) {
-            return List.of(text);
+    private String ensureByteLimit(String user, String system) {
+        log.info("ensureByteLimit: {}", system);
+
+        int systemLength = system.getBytes(StandardCharsets.UTF_8).length;
+        if (systemLength <= properties.maxReplyBytes()) {
+            log.info("ensureByteLimit result: {}", system);
+            return system;
         }
 
-        // Try splitting at sentence boundaries
-        return MessageSplitter.splitIntoMessages(text, maxBytes);
+        String response = chatClient.prompt()
+                .system(String.format(CONDENSE_PROMPT, properties.maxReplyBytes(), systemLength, user))
+                .user(system)
+                .call()
+                .content();
+
+        log.info("ensureByteLimit result: {}", response);
+        return response;
     }
+
 }

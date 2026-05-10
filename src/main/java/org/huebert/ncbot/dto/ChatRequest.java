@@ -10,6 +10,5 @@ public record ChatRequest(
     Long senderTimestamp,
     String path,
     Boolean isOutgoing,
-    Integer pathBytesPerHop,
-    String systemPrompt
+    Integer pathBytesPerHop
 ) {}
