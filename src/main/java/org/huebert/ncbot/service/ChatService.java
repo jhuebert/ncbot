@@ -27,8 +27,7 @@ public class ChatService {
 
     private static final String SYSTEM_PROMPT = """
             %s
-            Message History:
-            
+            ## Message History
             %s
             """;
 
