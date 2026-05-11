@@ -15,11 +15,11 @@ public class WeatherTool {
     private final WeatherService weatherService;
 
     @Tool(description = "Get current weather conditions for a location")
-    public String getWeather(@ToolParam(description = "City name, coordinates, or zip code") String location) {
-        log.info("getWeather: {}", location);
-        String result = weatherService.getWeather(location)
-                .orElse("Could not find weather for: " + location);
-        log.info("getWeather result: {}", result);
+    public String getWeather(@ToolParam(description = "Zip code") String zipCode) {
+        log.debug("getWeather: {}", zipCode);
+        String result = weatherService.getWeather(zipCode)
+                .orElse("Could not find weather for: " + zipCode);
+        log.debug("getWeather result: {}", result);
         return result;
     }
 }

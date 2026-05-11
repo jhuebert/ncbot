@@ -9,7 +9,7 @@ import java.time.Instant;
 @Entity
 @Table(name = "chat_messages", indexes = {
         @Index(name = "idx_channel_created", columnList = "channel_key, created_at"),
-        @Index(name = "idx_dm_sender_created", columnList = "is_dm, sender_key, created_at")
+        @Index(name = "idx_sender_created", columnList = "sender_key, created_at")
 })
 @Getter
 @Setter
@@ -54,19 +54,4 @@ public class ChatMessage {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    public ChatMessage(String senderName, String senderKey, String messageText,
-                       Boolean isDm, String channelKey, String channelName,
-                       Long senderTimestamp, String path, Boolean isOutgoing,
-                       Integer pathBytesPerHop) {
-        this.senderName = senderName;
-        this.senderKey = senderKey;
-        this.messageText = messageText;
-        this.isDm = isDm;
-        this.channelKey = channelKey;
-        this.channelName = channelName;
-        this.senderTimestamp = senderTimestamp;
-        this.path = path;
-        this.isOutgoing = isOutgoing;
-        this.pathBytesPerHop = pathBytesPerHop;
-    }
 }

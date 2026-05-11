@@ -31,7 +31,7 @@ public class WeatherService {
                 .retrieve()
                 .toEntity(new ParameterizedTypeReference<Map<String, Object>>() {
                 });
-        log.info("geoResponse: {}", geoResponse);
+        log.debug("geoResponse: {}", geoResponse);
 
         if (geoResponse.getStatusCode() != HttpStatus.OK) {
             log.error("error encountered during geocoding: {}", geoResponse);

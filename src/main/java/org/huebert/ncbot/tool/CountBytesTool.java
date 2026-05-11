@@ -13,9 +13,9 @@ public class CountBytesTool {
 
     @Tool(description = "Get the UTF-8 encoded byte length of a text string")
     public int countBytes(@ToolParam(description = "The text string to measure") String text) {
-        log.info("countBytes text: {}", text);
+        log.debug("countBytes text: {}", text);
         int length = text.getBytes(StandardCharsets.UTF_8).length;
-        log.info("countBytes result: {}", length);
+        log.debug("countBytes result: {}", length);
         return length;
     }
 

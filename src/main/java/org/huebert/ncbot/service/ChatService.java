@@ -5,10 +5,13 @@ import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.dto.ChatResponse;
 import org.huebert.ncbot.entity.ChatMessage;
+import org.huebert.ncbot.entity.ConversationMemory;
 import org.huebert.ncbot.repository.ChatMessageRepository;
+import org.huebert.ncbot.repository.ConversationMemoryRepository;
 import org.huebert.ncbot.tool.CountBytesTool;
 import org.huebert.ncbot.tool.CurrentTimeTool;
 import org.huebert.ncbot.tool.WeatherTool;
+import org.huebert.ncbot.util.MessageFormatter;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
@@ -27,6 +30,8 @@ public class ChatService {
 
     private static final String SYSTEM_PROMPT = """
             %s
+            ## Conversation Memory
+            %s
             ## Message History
             %s
             """;
@@ -37,10 +42,9 @@ public class ChatService {
             The user message is in response to: %s
             """;
 
-    private static final String MESSAGE_FORMAT = "%s: %s";
-
     private final ChatClient chatClient;
     private final ChatMessageRepository messageRepository;
+    private final ConversationMemoryRepository conversationMemoryRepository;
     private final NcbotProperties properties;
 
     public ChatService(ChatModel chatModel,
@@ -48,26 +52,27 @@ public class ChatService {
                        NcbotProperties properties,
                        CountBytesTool countBytesTool,
                        WeatherTool weatherTool,
-                       CurrentTimeTool currentTimeTool
+                       CurrentTimeTool currentTimeTool, ConversationMemoryRepository conversationMemoryRepository
     ) {
         this.messageRepository = messageRepository;
         this.properties = properties;
+        this.conversationMemoryRepository = conversationMemoryRepository;
         this.chatClient = ChatClient.builder(chatModel)
                 .defaultTools(currentTimeTool, countBytesTool, weatherTool)
                 .build();
     }
 
     public ChatResponse processMessage(ChatRequest request) {
-        log.info("processMessage: {}", request);
+        log.debug("processMessage: {}", request);
 
         if (Boolean.TRUE.equals(request.isOutgoing())) {
-            log.info("Skipping outgoing message from {}", request.senderName());
+            log.debug("Skipping outgoing message from {}", request.senderName());
             return EMPTY_RESPONSE;
         }
 
         if (Boolean.TRUE.equals(request.isDm())) {
             if (!properties.allowDms()) {
-                log.info("Skipping DM — DMs not allowed");
+                log.debug("Skipping DM — DMs not allowed");
                 return EMPTY_RESPONSE;
             }
         }
@@ -76,7 +81,7 @@ public class ChatService {
             List<String> allowed = properties.allowedChannels();
             if (allowed != null && !allowed.isEmpty()) {
                 if (request.channelName() == null || !allowed.contains(request.channelName())) {
-                    log.info("Skipping channel {} — not in allowed list", request.channelName());
+                    log.debug("Skipping channel {} — not in allowed list", request.channelName());
                     return EMPTY_RESPONSE;
                 }
             }
@@ -85,7 +90,7 @@ public class ChatService {
         try {
             String response = invokeModel(request);
             saveInteraction(request, response);
-            log.info("processMessage result: {}", response);
+            log.debug("processMessage result: {}", response);
             return new ChatResponse(List.of(response));
         } catch (Exception e) {
             log.error("Error processing message: {}", e.getMessage(), e);
@@ -116,23 +121,30 @@ public class ChatService {
     }
 
     private String invokeModel(ChatRequest request) {
-        String userMessage = buildUserMessage(request);
-        log.info("userMessage: {}", userMessage);
+        String userMessage = MessageFormatter.buildUserMessage(request);
+        log.debug("userMessage: {}", userMessage);
 
         Instant since = ZonedDateTime.now().minusMinutes(properties.messageHistoryMinutes()).toInstant();
 
         List<ChatMessage> ms;
+        String memory;
         if (Boolean.TRUE.equals(request.isDm())) {
             ms = messageRepository.findLatestDms(request.senderKey(), since);
+            memory = conversationMemoryRepository.findDmMemory(request.senderKey())
+                    .map(ConversationMemory::getContent)
+                    .orElse("");
         } else {
             ms = messageRepository.findLatestChannelMessages(request.channelKey(), since);
+            memory = conversationMemoryRepository.findChannelMemory(request.channelKey())
+                    .map(ConversationMemory::getContent)
+                    .orElse("");
         }
         String messages = ms.stream()
-                .map(this::buildUserMessage)
+                .map(MessageFormatter::buildUserMessage)
                 .collect(Collectors.joining("\n"));
 
-        String systemPrompt = String.format(SYSTEM_PROMPT, properties.systemPrompt(), messages);
-        log.info("systemPrompt: {}", systemPrompt);
+        String systemPrompt = String.format(SYSTEM_PROMPT, properties.systemPrompt(), memory, messages);
+        log.debug("systemPrompt: {}", systemPrompt);
 
         String response = chatClient.prompt()
                 .system(systemPrompt)
@@ -144,20 +156,12 @@ public class ChatService {
         return ensureByteLimit(userMessage, response);
     }
 
-    private String buildUserMessage(ChatRequest request) {
-        return String.format(MESSAGE_FORMAT, request.senderName(), request.messageText());
-    }
-
-    private String buildUserMessage(ChatMessage message) {
-        return String.format(MESSAGE_FORMAT, message.getSenderName(), message.getMessageText());
-    }
-
     private String ensureByteLimit(String user, String system) {
-        log.info("ensureByteLimit: {}", system);
+        log.debug("ensureByteLimit: {}", system);
 
         int systemLength = system.getBytes(StandardCharsets.UTF_8).length;
         if (systemLength <= properties.maxReplyBytes()) {
-            log.info("ensureByteLimit result: {}", system);
+            log.debug("ensureByteLimit result: {}", system);
             return system;
         }
 
@@ -167,7 +171,7 @@ public class ChatService {
                 .call()
                 .content();
 
-        log.info("ensureByteLimit result: {}", response);
+        log.debug("ensureByteLimit result: {}", response);
         return response;
     }
 

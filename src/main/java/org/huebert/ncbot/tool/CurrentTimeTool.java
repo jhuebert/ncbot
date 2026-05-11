@@ -14,7 +14,8 @@ public class CurrentTimeTool {
     @Tool(description = "Gets the current time")
     public String currentTime() {
         String now = ZonedDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME);
-        log.info("currentTime: {}", now);
+        log.debug("currentTime: {}", now);
         return now;
     }
+
 }

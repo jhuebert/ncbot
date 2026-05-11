@@ -30,4 +30,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     @Query("SELECT DISTINCT m.channelKey FROM ChatMessage m WHERE m.channelKey IS NOT NULL")
     List<String> findDistinctChannelKeys();
 
+    @Query("SELECT DISTINCT m.senderKey FROM ChatMessage m WHERE m.senderKey IS NOT NULL")
+    List<String> findDistinctSenderKeys();
+
 }
