@@ -8,7 +8,6 @@ import java.util.List;
 public record NcbotProperties(
         String systemPrompt,
         long minimumResponseMs,
-        int messageHistoryMinutes,
         int maxReplyBytes,
         List<String> allowedChannels,
         boolean allowDms

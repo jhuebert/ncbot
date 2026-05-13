@@ -27,11 +27,11 @@ ncbot:
     You are tasked to respond to the user message in a short and concise way.
     Your entire response should be no more than 128 UTF-8 bytes in length.
     Use emojis to save bytes.
-    You can tag users in messages with a specific format. For example @[nc1v] would tag nc1v
+    Tag users as @[username] (e.g. @[nc1v])
     Do not prefix your response with your name.
     Use the available tools to help you.
     Use the provided long term conversation memory and the latest messages to help you respond as a participant in the conversation.
-  message-history-minutes: ${NCBOT_MESSAGE_HISTORY_MINUTES:30}
+  memory-update-cron: ${NCBOT_MEMORY_UPDATE_CRON:3 0 * * *}
   minimum-response-ms: ${NCBOT_MINIMUM_RESPONSE_MS:0}
   max-reply-bytes: ${NCBOT_MAX_REPLY_BYTES:128}
   allowed-channels:
@@ -46,4 +46,4 @@ gg:
 logging:
   level:
     root: WARN
-    org.huebert: INFO
+    org.huebert: DEBUG

@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -37,9 +38,7 @@ public class ChatService {
             """;
 
     private static final String CONDENSE_PROMPT = """
-            Your task is to condense the user message so that it is no more than %d UTF-8 bytes.
-            It is currently %d bytes long.
-            The user message is in response to: %s
+            Condense the following message to ≤%d UTF-8 bytes (currently %d bytes). Preserve meaning; cut filler. Context it replies to: "%s"
             """;
 
     private final ChatClient chatClient;
@@ -124,26 +123,26 @@ public class ChatService {
         String userMessage = MessageFormatter.buildUserMessage(request);
         log.debug("userMessage: {}", userMessage);
 
-        Instant since = ZonedDateTime.now().minusMinutes(properties.messageHistoryMinutes()).toInstant();
-
         List<ChatMessage> ms;
-        String memory;
+        Optional<ConversationMemory> memory;
         if (Boolean.TRUE.equals(request.isDm())) {
+            memory = conversationMemoryRepository.findDmMemory(request.senderKey());
+            Instant since = memory
+                    .map(ConversationMemory::getUpdatedAt)
+                    .orElse(ZonedDateTime.now().minusYears(10).toInstant());
             ms = messageRepository.findLatestDms(request.senderKey(), since);
-            memory = conversationMemoryRepository.findDmMemory(request.senderKey())
-                    .map(ConversationMemory::getContent)
-                    .orElse("");
         } else {
+            memory = conversationMemoryRepository.findChannelMemory(request.channelKey());
+            Instant since = memory
+                    .map(ConversationMemory::getUpdatedAt)
+                    .orElse(ZonedDateTime.now().minusYears(10).toInstant());
             ms = messageRepository.findLatestChannelMessages(request.channelKey(), since);
-            memory = conversationMemoryRepository.findChannelMemory(request.channelKey())
-                    .map(ConversationMemory::getContent)
-                    .orElse("");
         }
         String messages = ms.stream()
                 .map(MessageFormatter::buildUserMessage)
                 .collect(Collectors.joining("\n"));
 
-        String systemPrompt = String.format(SYSTEM_PROMPT, properties.systemPrompt(), memory, messages);
+        String systemPrompt = String.format(SYSTEM_PROMPT, properties.systemPrompt(), memory.map(ConversationMemory::getContent).orElse("no previous memory"), messages);
         log.debug("systemPrompt: {}", systemPrompt);
 
         String response = chatClient.prompt()

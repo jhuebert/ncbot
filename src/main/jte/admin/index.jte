@@ -66,10 +66,6 @@
                     <td>${properties.maxReplyBytes()}</td>
                 </tr>
                 <tr>
-                    <td>History Limit</td>
-                    <td>${properties.messageHistoryMinutes()} minutes</td>
-                </tr>
-                <tr>
                     <td>Allow DMs</td>
                     <td>${properties.allowDms()}</td>
                 </tr>

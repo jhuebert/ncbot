@@ -19,10 +19,6 @@
                         <td>Max Reply Bytes</td>
                         <td>${properties.maxReplyBytes()}</td>
                     </tr>
-                    <tr>
-                        <td>History Limit</td>
-                        <td>${properties.messageHistoryMinutes()} minutes</td>
-                    </tr>
                 </tbody>
             </table>
         </div>
