@@ -29,11 +29,14 @@ public class ChatService {
 
     private static final ChatResponse EMPTY_RESPONSE = new ChatResponse(List.of());
 
-    private static final String SYSTEM_PROMPT = """
-            %s
+
+    private static final String USER_PROMPT = """
             ## Conversation Memory
+            
             %s
-            ## Message History
+            
+            ## Latest Messages
+            
             %s
             """;
 
@@ -138,16 +141,18 @@ public class ChatService {
                     .orElse(ZonedDateTime.now().minusYears(10).toInstant());
             ms = messageRepository.findLatestChannelMessages(request.channelKey(), since);
         }
+
         String messages = ms.stream()
                 .map(MessageFormatter::buildUserMessage)
                 .collect(Collectors.joining("\n"));
+        messages += "\n" + userMessage;
 
-        String systemPrompt = String.format(SYSTEM_PROMPT, properties.systemPrompt(), memory.map(ConversationMemory::getContent).orElse("no previous memory"), messages);
-        log.debug("systemPrompt: {}", systemPrompt);
-
+        String memoryContent = memory.map(ConversationMemory::getContent).orElse("no previous memory");
+        String user = String.format(USER_PROMPT, memoryContent, messages, userMessage);
+        log.info("user = {}", user);
         String response = chatClient.prompt()
-                .system(systemPrompt)
-                .user(userMessage)
+                .system(properties.systemPrompt())
+                .user(user)
                 .messages()
                 .call()
                 .content();

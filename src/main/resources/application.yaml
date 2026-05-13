@@ -30,7 +30,7 @@ ncbot:
     Tag users as @[username] (e.g. @[nc1v])
     Do not prefix your response with your name.
     Use the available tools to help you.
-    Use the provided long term conversation memory and the latest messages to help you respond as a participant in the conversation.
+    Use the provided conversation memory and latest messages to help you respond as a participant in the conversation.
   memory-update-cron: ${NCBOT_MEMORY_UPDATE_CRON:3 0 * * *}
   minimum-response-ms: ${NCBOT_MINIMUM_RESPONSE_MS:0}
   max-reply-bytes: ${NCBOT_MAX_REPLY_BYTES:128}
