@@ -41,7 +41,9 @@ public class ChatService {
             """;
 
     private static final String CONDENSE_PROMPT = """
-            Condense the following message to ≤%d UTF-8 bytes (currently %d bytes). Preserve meaning; cut filler. Context it replies to: "%s"
+            Request: %s
+            Response: %s
+            Current Length: %s
             """;
 
     private final ChatClient chatClient;
@@ -148,7 +150,7 @@ public class ChatService {
         messages += "\n" + userMessage;
 
         String memoryContent = memory.map(ConversationMemory::getContent).orElse("no previous memory");
-        String user = String.format(USER_PROMPT, memoryContent, messages, userMessage);
+        String user = String.format(USER_PROMPT, memoryContent, messages);
         log.info("user = {}", user);
         String response = chatClient.prompt()
                 .system(properties.systemPrompt())
@@ -170,8 +172,8 @@ public class ChatService {
         }
 
         String response = chatClient.prompt()
-                .system(String.format(CONDENSE_PROMPT, properties.maxReplyBytes(), systemLength, user))
-                .user(system)
+                .system(properties.condensePrompt())
+                .user(String.format(CONDENSE_PROMPT, user, system, systemLength))
                 .call()
                 .content();
 

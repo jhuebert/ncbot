@@ -31,6 +31,20 @@ ncbot:
     Do not prefix your response with your name.
     Use the available tools to help you.
     Use the provided conversation memory and latest messages to help you respond as a participant in the conversation.
+  condense-prompt: |
+    Condense the following response to ≤128 UTF-8 bytes.
+    Preserve meaning; cut filler.
+    Response should only be the shorted response with nothing else.
+  memory-prompt: |
+    Your task is to summarize the provided conversation history.
+    The summary that is produced will be used by ncbot as its long term memory.
+  combine-prompt: |
+    You are an expert at combining historical conversation memory with new information.
+    You will be provided the historical conversation memory followed by a summary of new information.
+    Your response should be an updated conversation memory that contains important information from both.
+    You can assume the new information comes after the historical memory.
+    The only time you should omit information is when it is no longer relevant or has been superseded by later information.
+    You may return the historical conversation memory when nothing should be changed.
   memory-update-cron: ${NCBOT_MEMORY_UPDATE_CRON:3 0 * * *}
   minimum-response-ms: ${NCBOT_MINIMUM_RESPONSE_MS:0}
   max-reply-bytes: ${NCBOT_MAX_REPLY_BYTES:128}

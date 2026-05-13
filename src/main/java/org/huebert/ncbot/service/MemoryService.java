@@ -2,6 +2,7 @@ package org.huebert.ncbot.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
+import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.entity.ChatMessage;
 import org.huebert.ncbot.entity.ConversationMemory;
 import org.huebert.ncbot.repository.ChatMessageRepository;
@@ -15,7 +16,6 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.time.ZonedDateTime;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -23,18 +23,13 @@ import java.util.stream.Collectors;
 public class MemoryService {
 
     private static final String COMBINE_PROMPT = """
-            You are an expert at combining historical conversation memory with new information.
-            You will be provided the historical conversation memory followed by a summary of new information.
-            Your response should be an updated conversation memory that contains important information from both.
-            You can assume the new information comes after the historical memory.
-            The only time you should omit information is when it is no longer relevant or has been superceded by later information.
-            You may return the historical conversation memory when nothing should be changed.
+            ## Historical Memory
+            %s
+            ## New Information
+            %s
             """;
 
-    private static final String MEMORY_PROMPT = """
-            Your task is to summarize the provided conversation history.
-            The summary that is produced will be used by ncbot as its long term memory.
-            """;
+    private final NcbotProperties ncbotProperties;
 
     private final ChatMessageRepository chatMessageRepository;
 
@@ -42,7 +37,8 @@ public class MemoryService {
 
     private final ChatClient chatClient;
 
-    public MemoryService(ChatModel chatModel, ChatMessageRepository chatMessageRepository, ConversationMemoryRepository conversationMemoryRepository) {
+    public MemoryService(NcbotProperties ncbotProperties, ChatModel chatModel, ChatMessageRepository chatMessageRepository, ConversationMemoryRepository conversationMemoryRepository) {
+        this.ncbotProperties = ncbotProperties;
         this.chatMessageRepository = chatMessageRepository;
         this.conversationMemoryRepository = conversationMemoryRepository;
         this.chatClient = ChatClient.builder(chatModel)
@@ -108,7 +104,7 @@ public class MemoryService {
         log.debug("updateMemory user: {}", user);
 
         String response = chatClient.prompt()
-                .system(MEMORY_PROMPT)
+                .system(ncbotProperties.memoryPrompt())
                 .user(user)
                 .call()
                 .content();
@@ -131,13 +127,8 @@ public class MemoryService {
         }
 
         String response = chatClient.prompt()
-                .system(COMBINE_PROMPT)
-                .user(String.format("""
-                        ## Historical Memory
-                        %s
-                        ## New Information
-                        %s
-                        """, current, additional))
+                .system(ncbotProperties.combinePrompt())
+                .user(String.format(COMBINE_PROMPT, current, additional))
                 .call()
                 .content();
 
