@@ -79,30 +79,46 @@ public class WeatherService {
         @SuppressWarnings("unchecked")
         Map<String, Object> current = (Map<String, Object>) weatherBody.get("current");
 
-        int temp = ((Number) current.get("temperature_2m")).intValue();
+        int temp = (int) Math.rint((((Number) current.get("temperature_2m")).doubleValue()) * 1.8 + 32.0);
         int humidity = ((Number) current.get("relative_humidity_2m")).intValue();
-        int windSpeed = ((Number) current.get("wind_speed_10m")).intValue();
+        int windSpeed = (int) Math.rint(((Number) current.get("wind_speed_10m")).doubleValue() * 0.6213711922);
         int weatherCode = ((Number) current.get("weather_code")).intValue();
 
         String condition = weatherCodeToString(weatherCode);
-        return Optional.of(String.format("%s: %d°C, %s, %d%% humidity, %d km/h wind",
+        return Optional.of(String.format("%s: %d°F, %s, %d%% humidity, %d mph wind",
                 name, temp, condition, humidity, windSpeed));
     }
 
     private String weatherCodeToString(int code) {
         return switch (code) {
-            case 0 -> "clear sky";
-            case 1, 2, 3 -> "partly cloudy";
-            case 45, 48 -> "foggy";
-            case 51, 53, 55 -> "light drizzle";
-            case 56, 57 -> "freezing drizzle";
-            case 61, 63, 65 -> "rain";
-            case 66, 67 -> "freezing rain";
-            case 71, 73, 75 -> "snow";
+            case 0 -> "clear";
+            case 1 -> "mostly clear";
+            case 2 -> "partly cloudy";
+            case 3 -> "overcast";
+            case 45 -> "fog";
+            case 48 -> "icy fog";
+            case 51 -> "light drizzle";
+            case 53 -> "drizzle";
+            case 55 -> "heavy drizzle";
+            case 56 -> "light freezing drizzle";
+            case 57 -> "freezing drizzle";
+            case 61 -> "light rain";
+            case 63 -> "rain";
+            case 65 -> "heavy rain";
+            case 66 -> "light freezing rain";
+            case 67 -> "freezing rain";
+            case 71 -> "light snow";
+            case 73 -> "snow";
+            case 75 -> "heavy snow";
             case 77 -> "snow grains";
-            case 80, 81, 82 -> "rain showers";
-            case 85, 86 -> "snow showers";
-            case 95, 96, 99 -> "thunderstorm";
+            case 80 -> "light showers";
+            case 81 -> "showers";
+            case 82 -> "heavy showers";
+            case 85 -> "light snow showers";
+            case 86 -> "snow showers";
+            case 95 -> "thunderstorm";
+            case 96 -> "light thunderstorm with hail";
+            case 99 -> "thunderstorm with hail";
             default -> "code " + code;
         };
     }

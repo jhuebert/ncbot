@@ -9,7 +9,6 @@ import org.huebert.ncbot.entity.ConversationMemory;
 import org.huebert.ncbot.repository.ChatMessageRepository;
 import org.huebert.ncbot.repository.ConversationMemoryRepository;
 import org.huebert.ncbot.tool.CountBytesTool;
-import org.huebert.ncbot.tool.CurrentTimeTool;
 import org.huebert.ncbot.tool.WeatherTool;
 import org.huebert.ncbot.util.MessageFormatter;
 import org.springframework.ai.chat.client.ChatClient;
@@ -19,6 +18,7 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
@@ -34,6 +34,10 @@ public class ChatService {
             ## Conversation Memory
             
             %s
+            
+            ## Additional Context
+            
+            Current Time: %s
             
             ## Latest Messages
             
@@ -56,13 +60,13 @@ public class ChatService {
                        NcbotProperties properties,
                        CountBytesTool countBytesTool,
                        WeatherTool weatherTool,
-                       CurrentTimeTool currentTimeTool, ConversationMemoryRepository conversationMemoryRepository
+                       ConversationMemoryRepository conversationMemoryRepository
     ) {
         this.messageRepository = messageRepository;
         this.properties = properties;
         this.conversationMemoryRepository = conversationMemoryRepository;
         this.chatClient = ChatClient.builder(chatModel)
-                .defaultTools(currentTimeTool, countBytesTool, weatherTool)
+                .defaultTools(countBytesTool, weatherTool)
                 .build();
     }
 
@@ -150,7 +154,7 @@ public class ChatService {
         messages += "\n" + userMessage;
 
         String memoryContent = memory.map(ConversationMemory::getContent).orElse("no previous memory");
-        String user = String.format(USER_PROMPT, memoryContent, messages);
+        String user = String.format(USER_PROMPT, memoryContent, ZonedDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME), messages);
         log.info("user = {}", user);
         String response = chatClient.prompt()
                 .system(properties.systemPrompt())
