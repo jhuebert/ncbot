@@ -35,13 +35,13 @@ public class ChatService {
             
             %s
             
-            ## Additional Context
-            
-            Current Time: %s
-            
             ## Latest Messages
             
             %s
+            
+            ## Additional Context
+            
+            Current Time: %s
             """;
 
     private static final String CONDENSE_PROMPT = """
@@ -154,7 +154,7 @@ public class ChatService {
         messages += "\n" + userMessage;
 
         String memoryContent = memory.map(ConversationMemory::getContent).orElse("no previous memory");
-        String user = String.format(USER_PROMPT, memoryContent, ZonedDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME), messages);
+        String user = String.format(USER_PROMPT, memoryContent, messages, ZonedDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
         log.info("user = {}", user);
         String response = chatClient.prompt()
                 .system(properties.systemPrompt())
