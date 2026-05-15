@@ -8,7 +8,6 @@ import org.huebert.ncbot.entity.ChatMessage;
 import org.huebert.ncbot.entity.ConversationMemory;
 import org.huebert.ncbot.repository.ChatMessageRepository;
 import org.huebert.ncbot.repository.ConversationMemoryRepository;
-import org.huebert.ncbot.tool.CountBytesTool;
 import org.huebert.ncbot.tool.WeatherTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -36,16 +35,16 @@ public class ChatService {
     public ChatService(ChatModel chatModel,
                        ChatMessageRepository messageRepository,
                        NcbotProperties properties,
-                       CountBytesTool countBytesTool,
                        WeatherTool weatherTool,
-                       ConversationMemoryRepository conversationMemoryRepository, TemplateService templateService
+                       ConversationMemoryRepository conversationMemoryRepository,
+                       TemplateService templateService
     ) {
         this.messageRepository = messageRepository;
         this.properties = properties;
         this.conversationMemoryRepository = conversationMemoryRepository;
         this.templateService = templateService;
         this.chatClient = ChatClient.builder(chatModel)
-                .defaultTools(countBytesTool, weatherTool)
+                .defaultTools(weatherTool)
                 .build();
     }
 

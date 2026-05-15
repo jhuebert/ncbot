@@ -17,9 +17,12 @@ public class WeatherTool {
 
     private final WeatherService weatherService;
 
-    @Tool(description = "Get current weather conditions for a location")
-    public WeatherToolResponse getWeather(@ToolParam(description = "Latitude") double latitude, @ToolParam(description = "Latitude") double longitude) {
-        log.debug("getWeather: latitude={}, longitude={}", latitude, longitude);
+    @Tool(description = "Get current weather for a location")
+    public WeatherToolResponse getCurrentWeather(
+            @ToolParam(description = "Latitude") double latitude,
+            @ToolParam(description = "Longitude") double longitude
+    ) {
+        log.debug("getCurrentWeather: latitude={}, longitude={}", latitude, longitude);
         WeatherToolResponse result = weatherService.getWeather(latitude, longitude)
                 .map(r -> WeatherToolResponse.builder()
                         .conditionsDescription(WeatherCode.fromCode(r.current().weatherCode()).getDescription())
@@ -29,7 +32,7 @@ public class WeatherTool {
                         .windDirectionDegrees(r.current().windDirection10m())
                         .build())
                 .orElse(null);
-        log.debug("getWeather result: {}", result);
+        log.debug("getCurrentWeather result: {}", result);
         return result;
     }
 
