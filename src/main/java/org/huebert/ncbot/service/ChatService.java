@@ -10,7 +10,6 @@ import org.huebert.ncbot.repository.ChatMessageRepository;
 import org.huebert.ncbot.repository.ConversationMemoryRepository;
 import org.huebert.ncbot.tool.CountBytesTool;
 import org.huebert.ncbot.tool.WeatherTool;
-import org.huebert.ncbot.util.MessageFormatter;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.stereotype.Service;
@@ -18,10 +17,9 @@ import org.springframework.stereotype.Service;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
@@ -29,42 +27,23 @@ public class ChatService {
 
     private static final ChatResponse EMPTY_RESPONSE = new ChatResponse(List.of());
 
-
-    private static final String USER_PROMPT = """
-            ## Conversation Memory
-            
-            %s
-            
-            ## Latest Messages
-            
-            %s
-            
-            ## Additional Context
-            
-            Current Time: %s
-            """;
-
-    private static final String CONDENSE_PROMPT = """
-            Request: %s
-            Response: %s
-            Current Length: %s
-            """;
-
     private final ChatClient chatClient;
     private final ChatMessageRepository messageRepository;
     private final ConversationMemoryRepository conversationMemoryRepository;
     private final NcbotProperties properties;
+    private final TemplateService templateService;
 
     public ChatService(ChatModel chatModel,
                        ChatMessageRepository messageRepository,
                        NcbotProperties properties,
                        CountBytesTool countBytesTool,
                        WeatherTool weatherTool,
-                       ConversationMemoryRepository conversationMemoryRepository
+                       ConversationMemoryRepository conversationMemoryRepository, TemplateService templateService
     ) {
         this.messageRepository = messageRepository;
         this.properties = properties;
         this.conversationMemoryRepository = conversationMemoryRepository;
+        this.templateService = templateService;
         this.chatClient = ChatClient.builder(chatModel)
                 .defaultTools(countBytesTool, weatherTool)
                 .build();
@@ -129,8 +108,7 @@ public class ChatService {
     }
 
     private String invokeModel(ChatRequest request) {
-        String userMessage = MessageFormatter.buildUserMessage(request);
-        log.debug("userMessage: {}", userMessage);
+        log.debug("invokeModel: {}", request);
 
         List<ChatMessage> ms;
         Optional<ConversationMemory> memory;
@@ -148,41 +126,44 @@ public class ChatService {
             ms = messageRepository.findLatestChannelMessages(request.channelKey(), since);
         }
 
-        String messages = ms.stream()
-                .map(MessageFormatter::buildUserMessage)
-                .collect(Collectors.joining("\n"));
-        messages += "\n" + userMessage;
+        String output = templateService.render("chat", Map.of(
+                "memory", memory.orElse(null),
+                "messages", ms,
+                "request", request
+        ));
 
-        String memoryContent = memory.map(ConversationMemory::getContent).orElse("no previous memory");
-        String user = String.format(USER_PROMPT, memoryContent, messages, ZonedDateTime.now().format(DateTimeFormatter.ISO_DATE_TIME));
-        log.info("user = {}", user);
         String response = chatClient.prompt()
                 .system(properties.systemPrompt())
-                .user(user)
+                .user(output)
                 .messages()
                 .call()
                 .content();
 
-        return ensureByteLimit(userMessage, response);
+        return ensureByteLimit(request, response);
     }
 
-    private String ensureByteLimit(String user, String system) {
-        log.debug("ensureByteLimit: {}", system);
+    private String ensureByteLimit(ChatRequest request, String response) {
+        log.debug("ensureByteLimit: {}", response);
 
-        int systemLength = system.getBytes(StandardCharsets.UTF_8).length;
-        if (systemLength <= properties.maxReplyBytes()) {
-            log.debug("ensureByteLimit result: {}", system);
-            return system;
+        if (response.getBytes(StandardCharsets.UTF_8).length <= properties.maxReplyBytes()) {
+            log.debug("ensureByteLimit result: {}", response);
+            return response;
         }
 
-        String response = chatClient.prompt()
+
+        String output = templateService.render("condense", Map.of(
+                "request", request,
+                "response", response
+        ));
+
+        String condensed = chatClient.prompt()
                 .system(properties.condensePrompt())
-                .user(String.format(CONDENSE_PROMPT, user, system, systemLength))
+                .user(output)
                 .call()
                 .content();
 
-        log.debug("ensureByteLimit result: {}", response);
-        return response;
+        log.debug("ensureByteLimit result: {}", condensed);
+        return condensed;
     }
 
 }
