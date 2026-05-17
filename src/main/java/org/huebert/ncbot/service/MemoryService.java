@@ -1,107 +1,114 @@
 package org.huebert.ncbot.service;
 
+import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.huebert.ncbot.config.NcbotProperties;
+import org.huebert.ncbot.entity.ChatChannel;
+import org.huebert.ncbot.entity.ChatMemory;
 import org.huebert.ncbot.entity.ChatMessage;
-import org.huebert.ncbot.entity.ConversationMemory;
+import org.huebert.ncbot.repository.ChatChannelRepository;
+import org.huebert.ncbot.repository.ChatMemory2Repository;
 import org.huebert.ncbot.repository.ChatMessageRepository;
-import org.huebert.ncbot.repository.ConversationMemoryRepository;
-import org.huebert.ncbot.util.MessageFormatter;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.time.ZonedDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class MemoryService {
 
-    private static final String COMBINE_PROMPT = """
-            ## Historical Memory
-            %s
-            ## New Information
-            %s
-            """;
+    private static final String DELETE_VALUE = "null";
 
     private final NcbotProperties ncbotProperties;
-
-    private final ChatMessageRepository chatMessageRepository;
-
-    private final ConversationMemoryRepository conversationMemoryRepository;
-
     private final ChatClient chatClient;
+    private final TemplateService templateService;
+    private final ChatChannelRepository chatChannelRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final ChatMemory2Repository chatMemoryRepository;
 
-    public MemoryService(NcbotProperties ncbotProperties, ChatModel chatModel, ChatMessageRepository chatMessageRepository, ConversationMemoryRepository conversationMemoryRepository) {
+    public MemoryService(NcbotProperties ncbotProperties, ChatChannelRepository chatChannelRepository, ChatModel chatModel, ChatMessageRepository chatMessageRepository, ChatMemory2Repository chatMemoryRepository, TemplateService templateService) {
         this.ncbotProperties = ncbotProperties;
+        this.chatChannelRepository = chatChannelRepository;
         this.chatMessageRepository = chatMessageRepository;
-        this.conversationMemoryRepository = conversationMemoryRepository;
+        this.chatMemoryRepository = chatMemoryRepository;
+        this.templateService = templateService;
         this.chatClient = ChatClient.builder(chatModel)
                 .build();
     }
 
-    @Scheduled(cron = "0 0 3 * * *")
-//    @Scheduled(fixedDelay = 30, timeUnit = TimeUnit.MINUTES)
+    @Scheduled(fixedDelayString = "${ncbot.memory-update-period}")
     public void updateMemory() {
+        log.debug("updateMemory");
+        Instant now = Instant.now();
 
-        for (String channelKey : chatMessageRepository.findDistinctChannelKeys()) {
-            log.debug("channelKey: {}", channelKey);
-            ConversationMemory memory = conversationMemoryRepository.findChannelMemory(channelKey).orElse(null);
-            if (memory == null) {
-                memory = ConversationMemory.builder()
-                        .channelKey(channelKey)
-                        .updatedAt(ZonedDateTime.now().minusYears(10).toInstant())
-                        .content("")
-                        .build();
-            }
-            List<ChatMessage> messages = chatMessageRepository.findLatestChannelMessages(channelKey, memory.getUpdatedAt());
-            log.debug("message count: {}", messages.size());
-            if (!messages.isEmpty()) {
-                updateMemory(memory, messages);
-            }
-            conversationMemoryRepository.save(memory);
-        }
+        for (ChatChannel channel : chatChannelRepository.findAll()) {
+            log.debug("channel: {}", channel);
 
-        for (String senderKey : chatMessageRepository.findDistinctSenderKeys()) {
-            log.debug("senderKey: {}", senderKey);
-            ConversationMemory memory = conversationMemoryRepository.findDmMemory(senderKey).orElse(null);
-            if (memory == null) {
-                memory = ConversationMemory.builder()
-                        .senderKey(senderKey)
-                        .updatedAt(ZonedDateTime.now().minusYears(10).toInstant())
-                        .content("")
-                        .build();
+            List<ChatMessage> messages = chatMessageRepository.findChannelMessages(channel.getId(), channel.getMemoryUpdatedAt(), now);
+            log.debug("messages count: {}", messages.size());
+            if (messages.isEmpty()) {
+                continue;
             }
-            List<ChatMessage> messages = chatMessageRepository.findLatestDms(senderKey, memory.getUpdatedAt());
-            log.debug("message count: {}", messages.size());
-            if (!messages.isEmpty()) {
-                updateMemory(memory, messages);
+
+            for (List<ChatMessage> partition : Lists.partition(messages, ncbotProperties.memoryPartitionSize())) {
+                updateMemory(channel, partition);
             }
-            conversationMemoryRepository.save(memory);
+
+            channel.setMemoryUpdatedAt(now);
+            chatChannelRepository.save(channel);
         }
     }
 
-    private void updateMemory(ConversationMemory memory, List<ChatMessage> messages) {
-        String additional = summarize(messages);
-        String updated = combine(memory.getContent(), additional);
-        if (!memory.getContent().equals(updated)) {
-            memory.setContent(updated);
-            memory.setUpdatedAt(Instant.now());
+    private void updateMemory(ChatChannel channel, List<ChatMessage> messages) {
+        log.debug("updateMemory: channel={}, messages size={}", channel, messages.size());
+
+        Map<String, ChatMemory> memories = chatMemoryRepository.findMemory(channel.getId()).stream()
+                .collect(Collectors.toMap(ChatMemory::getKey, a -> a));
+        log.debug("memories count: {}", memories.size());
+
+        for (Map.Entry<String, String> entry : getUpdates(memories, messages).entrySet()) {
+            ChatMemory memory = memories.get(entry.getKey());
+            if (memory == null) {
+                if (!DELETE_VALUE.equalsIgnoreCase(entry.getValue())) {
+                    // Added
+                    log.debug("adding memory: {}", entry);
+                    chatMemoryRepository.save(ChatMemory.builder()
+                            .chatChannelId(channel.getId())
+                            .key(entry.getKey())
+                            .value(entry.getValue())
+                            .build());
+                }
+            } else {
+                if (DELETE_VALUE.equalsIgnoreCase(entry.getValue())) {
+                    // Deleted
+                    log.debug("deleting memory: {}", entry);
+                    chatMemoryRepository.delete(memory);
+                } else {
+                    // Updated
+                    log.debug("updating memory: {}", entry);
+                    memory.setValue(entry.getValue());
+                    chatMemoryRepository.save(memory);
+                }
+            }
         }
     }
 
-    private String summarize(List<ChatMessage> messages) {
-        log.debug("summarize: {}", messages.size());
+    private Map<String, String> getUpdates(Map<String, ChatMemory> memories, List<ChatMessage> messages) {
+        log.debug("getUpdates: memories size={}, messages size={}", memories.size(), messages.size());
 
-        String user = messages.stream()
-                .map(MessageFormatter::buildUserMessage)
-                .collect(Collectors.joining("\n"));
-        log.debug("updateMemory user: {}", user);
+        String user = templateService.render("memory", Map.of(
+                "memories", memories.values(),
+                "messages", messages
+        ));
+        log.debug("getUpdates: user={}", user);
 
         String response = chatClient.prompt()
                 .system(ncbotProperties.memoryPrompt())
@@ -109,31 +116,22 @@ public class MemoryService {
                 .call()
                 .content();
 
-        log.debug("summarize result: {}", response);
-        return response;
-    }
-
-    private String combine(String current, String additional) {
-        log.debug("combine: current={}, additional={}", current, additional);
-
-        if (Strings.trimToNull(additional) == null) {
-            log.debug("additional memory was empty");
-            return current;
+        if ("EMPTY".equalsIgnoreCase(Strings.trimToNull(response))) {
+            log.debug("getUpdates result: EMPTY");
+            return Map.of();
         }
 
-        if (Strings.trimToNull(current) == null) {
-            log.debug("current memory was empty");
-            return additional;
+        Map<String, String> result = new HashMap<>();
+        for (String line : response.split("\n")) {
+            if (!line.contains("=")) {
+                continue;
+            }
+            String[] values = line.split("=");
+            result.put(values[0].trim(), values[1].trim());
         }
 
-        String response = chatClient.prompt()
-                .system(ncbotProperties.combinePrompt())
-                .user(String.format(COMBINE_PROMPT, current, additional))
-                .call()
-                .content();
-
-        log.debug("combine result: {}", response);
-        return response;
+        log.debug("getUpdates result: {}", result);
+        return result;
     }
 
 }

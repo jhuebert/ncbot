@@ -1,13 +1,16 @@
 package org.huebert.ncbot.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.apache.logging.log4j.util.Strings;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.dto.ChatResponse;
+import org.huebert.ncbot.entity.ChatChannel;
+import org.huebert.ncbot.entity.ChatMemory;
 import org.huebert.ncbot.entity.ChatMessage;
-import org.huebert.ncbot.entity.ConversationMemory;
+import org.huebert.ncbot.repository.ChatChannelRepository;
+import org.huebert.ncbot.repository.ChatMemory2Repository;
 import org.huebert.ncbot.repository.ChatMessageRepository;
-import org.huebert.ncbot.repository.ConversationMemoryRepository;
 import org.huebert.ncbot.tool.WeatherTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -15,10 +18,8 @@ import org.springframework.stereotype.Service;
 
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
-import java.time.ZonedDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Slf4j
 @Service
@@ -27,22 +28,25 @@ public class ChatService {
     private static final ChatResponse EMPTY_RESPONSE = new ChatResponse(List.of());
 
     private final ChatClient chatClient;
-    private final ChatMessageRepository messageRepository;
-    private final ConversationMemoryRepository conversationMemoryRepository;
     private final NcbotProperties properties;
     private final TemplateService templateService;
+    private final ChatChannelRepository chatChannelRepository;
+    private final ChatMessageRepository chatMessageRepository;
+    private final ChatMemory2Repository chatMemoryRepository;
 
     public ChatService(ChatModel chatModel,
-                       ChatMessageRepository messageRepository,
+                       ChatMessageRepository chatMessageRepository,
                        NcbotProperties properties,
                        WeatherTool weatherTool,
-                       ConversationMemoryRepository conversationMemoryRepository,
-                       TemplateService templateService
+                       TemplateService templateService,
+                       ChatChannelRepository chatChannelRepository,
+                       ChatMemory2Repository chatMemoryRepository
     ) {
-        this.messageRepository = messageRepository;
+        this.chatMessageRepository = chatMessageRepository;
         this.properties = properties;
-        this.conversationMemoryRepository = conversationMemoryRepository;
         this.templateService = templateService;
+        this.chatChannelRepository = chatChannelRepository;
+        this.chatMemoryRepository = chatMemoryRepository;
         this.chatClient = ChatClient.builder(chatModel)
                 .defaultTools(weatherTool)
                 .build();
@@ -74,8 +78,15 @@ public class ChatService {
         }
 
         try {
-            String response = invokeModel(request);
-            saveInteraction(request, response);
+            ChatChannel chatChannel = chatChannelRepository.findChannel(request.isDm(), request.isDm() ? request.senderKey() : request.channelKey())
+                    .orElseGet(() -> chatChannelRepository.saveAndFlush(ChatChannel.builder()
+                            .channelKey(request.isDm() ? request.senderKey() : request.channelKey())
+                            .channelName(request.isDm() ? request.senderName() : request.channelName())
+                            .isDm(request.isDm())
+                            .memoryUpdatedAt(Instant.EPOCH)
+                            .build()));
+            String response = invokeModel(chatChannel, request);
+            saveInteraction(chatChannel, request, response);
             log.debug("processMessage result: {}", response);
             return new ChatResponse(List.of(response));
         } catch (Exception e) {
@@ -84,50 +95,32 @@ public class ChatService {
         }
     }
 
-    private void saveInteraction(ChatRequest request, String response) {
-        ChatMessage user = ChatMessage.builder()
-                .channelName(request.channelName())
+    private void saveInteraction(ChatChannel chatChannel, ChatRequest request, String response) {
+        chatMessageRepository.save(ChatMessage.builder()
+                .chatChannelId(chatChannel.getId())
+                .content(request.messageText())
                 .createdAt(Instant.now())
-                .path(request.path())
-                .channelKey(request.channelKey())
-                .isDm(request.isDm())
-                .messageText(request.messageText())
-                .isOutgoing(request.isOutgoing())
-                .pathBytesPerHop(request.pathBytesPerHop())
-                .senderTimestamp(request.senderTimestamp())
-                .senderKey(request.senderKey())
                 .senderName(request.senderName())
-                .build();
-        ChatMessage system = user.toBuilder()
-                .senderName("ncbot")
-                .messageText(response)
-                .isOutgoing(true)
-                .build();
-        messageRepository.saveAll(List.of(user, system));
+                .build());
+        if (Strings.trimToNull(response) != null) {
+            chatMessageRepository.save(ChatMessage.builder()
+                    .chatChannelId(chatChannel.getId())
+                    .content(response)
+                    .createdAt(Instant.now())
+                    .senderName("ncbot")
+                    .build());
+        }
     }
 
-    private String invokeModel(ChatRequest request) {
+    private String invokeModel(ChatChannel chatChannel, ChatRequest request) {
         log.debug("invokeModel: {}", request);
 
-        List<ChatMessage> ms;
-        Optional<ConversationMemory> memory;
-        if (Boolean.TRUE.equals(request.isDm())) {
-            memory = conversationMemoryRepository.findDmMemory(request.senderKey());
-            Instant since = memory
-                    .map(ConversationMemory::getUpdatedAt)
-                    .orElse(ZonedDateTime.now().minusYears(10).toInstant());
-            ms = messageRepository.findLatestDms(request.senderKey(), since);
-        } else {
-            memory = conversationMemoryRepository.findChannelMemory(request.channelKey());
-            Instant since = memory
-                    .map(ConversationMemory::getUpdatedAt)
-                    .orElse(ZonedDateTime.now().minusYears(10).toInstant());
-            ms = messageRepository.findLatestChannelMessages(request.channelKey(), since);
-        }
+        List<ChatMessage> messages = chatMessageRepository.findChannelMessages(chatChannel.getId(), chatChannel.getMemoryUpdatedAt(), Instant.now());
+        List<ChatMemory> memories = chatMemoryRepository.findMemory(chatChannel.getId());
 
         String output = templateService.render("chat", Map.of(
-                "memory", memory.orElse(null),
-                "messages", ms,
+                "memories", memories,
+                "messages", messages,
                 "request", request
         ));
 
@@ -137,6 +130,10 @@ public class ChatService {
                 .messages()
                 .call()
                 .content();
+
+        if ("EMPTY".equalsIgnoreCase(Strings.trimToNull(response))) {
+            return "";
+        }
 
         return ensureByteLimit(request, response);
     }

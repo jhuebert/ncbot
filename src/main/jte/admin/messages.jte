@@ -39,13 +39,7 @@
                     <tr>
                         <td class="mono">${msg.getCreatedAt().toString()}</td>
                         <td>${msg.getSenderName() != null ? msg.getSenderName() : "(none)"}</td>
-                        <td>
-                            <span class="badge ${msg.getIsDm() ? "badge-dm" : "badge-channel"}">
-                                ${msg.getIsDm() ? "DM" : "Channel"}
-                            </span>
-                        </td>
-                        <td class="mono">${msg.getChannelKey() != null ? msg.getChannelKey().toUpperCase() : (msg.getSenderKey() != null ? msg.getSenderKey().toUpperCase() : "-")}</td>
-                        <td class="message-text">${msg.getMessageText() != null ? msg.getMessageText() : ""}</td>
+
                     </tr>
                 @endfor
                 </tbody>

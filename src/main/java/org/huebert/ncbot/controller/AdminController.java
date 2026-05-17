@@ -32,23 +32,23 @@ public class AdminController {
 
     @GetMapping
     public String dashboard(Model model) {
-        long totalMessages = messageRepository.count();
-        long channelMessages = messageRepository.findAll()
-                .stream().filter(m -> Boolean.FALSE.equals(m.getIsDm())).count();
-        long dmMessages = totalMessages - channelMessages;
-
-        Map<String, Long> channelStats = new LinkedHashMap<>();
-        for (String channelKey : messageRepository.findDistinctChannelKeys()) {
-            channelStats.put(channelKey, messageRepository.countByChannelKey(channelKey));
-        }
-
-        Duration uptime = Duration.between(startTime, Instant.now());
-        model.addAttribute("totalMessages", totalMessages);
-        model.addAttribute("channelMessages", channelMessages);
-        model.addAttribute("dmMessages", dmMessages);
-        model.addAttribute("channelStats", channelStats);
-        model.addAttribute("uptimeStr", formatUptime(uptime));
-        model.addAttribute("properties", properties);
+//        long totalMessages = messageRepository.count();
+//        long channelMessages = messageRepository.findAll()
+//                .stream().filter(m -> Boolean.FALSE.equals(m.getIsDm())).count();
+//        long dmMessages = totalMessages - channelMessages;
+//
+//        Map<String, Long> channelStats = new LinkedHashMap<>();
+//        for (String channelKey : messageRepository.findDistinctChannelKeys()) {
+//            channelStats.put(channelKey, messageRepository.countByChannelKey(channelKey));
+//        }
+//
+//        Duration uptime = Duration.between(startTime, Instant.now());
+//        model.addAttribute("totalMessages", totalMessages);
+//        model.addAttribute("channelMessages", channelMessages);
+//        model.addAttribute("dmMessages", dmMessages);
+//        model.addAttribute("channelStats", channelStats);
+//        model.addAttribute("uptimeStr", formatUptime(uptime));
+//        model.addAttribute("properties", properties);
         return "admin/index";
     }
 

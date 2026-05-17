@@ -22,7 +22,7 @@ public class NcbotApplication {
     public RestClientCustomizer restClientTimeoutCustomizer() {
         return restClientBuilder -> {
             SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-            factory.setConnectTimeout(60000);
+            factory.setConnectTimeout(600000);
             factory.setReadTimeout(600000);
             restClientBuilder.requestFactory(factory);
         };

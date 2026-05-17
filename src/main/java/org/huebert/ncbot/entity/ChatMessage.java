@@ -7,9 +7,8 @@ import java.time.Instant;
 
 @Builder(toBuilder = true)
 @Entity
-@Table(name = "chat_messages", indexes = {
-        @Index(name = "idx_channel_created", columnList = "channel_key, created_at"),
-        @Index(name = "idx_sender_created", columnList = "sender_key, created_at")
+@Table(name = "chat_message", indexes = {
+        @Index(name = "idx_chat_item_channel_created", columnList = "chat_channel_id, created_at")
 })
 @Getter
 @Setter
@@ -21,37 +20,16 @@ public class ChatMessage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "sender_name")
+    @Column(name = "chat_channel_id", nullable = false)
+    private Long chatChannelId;
+
+    @Column(name = "sender_name", nullable = false)
     private String senderName;
 
-    @Column(name = "sender_key", length = 64)
-    private String senderKey;
+    @Column(name = "content", nullable = false)
+    private String content;
 
-    @Column(name = "message_text", columnDefinition = "TEXT")
-    private String messageText;
-
-    @Column(name = "is_dm")
-    private Boolean isDm;
-
-    @Column(name = "channel_key", length = 32)
-    private String channelKey;
-
-    @Column(name = "channel_name")
-    private String channelName;
-
-    @Column(name = "sender_timestamp")
-    private Long senderTimestamp;
-
-    @Column(name = "path")
-    private String path;
-
-    @Column(name = "is_outgoing")
-    private Boolean isOutgoing;
-
-    @Column(name = "path_bytes_per_hop")
-    private Integer pathBytesPerHop;
-
-    @Column(name = "created_at", nullable = false, updatable = false)
+    @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
 }

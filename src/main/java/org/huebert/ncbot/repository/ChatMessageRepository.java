@@ -12,25 +12,9 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     @Query("""
             SELECT m
             FROM ChatMessage m
-            WHERE m.channelKey = :channelKey AND m.createdAt > :since
+            WHERE m.chatChannelId = :chatChannelId AND m.createdAt > :start AND m.createdAt < :end
             ORDER BY m.createdAt ASC
             """)
-    List<ChatMessage> findLatestChannelMessages(String channelKey, Instant since);
-
-    @Query("""
-            SELECT m
-            FROM ChatMessage m
-            WHERE m.isDm IS TRUE AND m.senderKey = :senderKey AND m.createdAt > :since
-            ORDER BY m.createdAt ASC
-            """)
-    List<ChatMessage> findLatestDms(String senderKey, Instant since);
-
-    long countByChannelKey(String channelKey);
-
-    @Query("SELECT DISTINCT m.channelKey FROM ChatMessage m WHERE m.channelKey IS NOT NULL")
-    List<String> findDistinctChannelKeys();
-
-    @Query("SELECT DISTINCT m.senderKey FROM ChatMessage m WHERE m.senderKey IS NOT NULL")
-    List<String> findDistinctSenderKeys();
+    List<ChatMessage> findChannelMessages(Long chatChannelId, Instant start, Instant end);
 
 }
