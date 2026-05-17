@@ -15,46 +15,60 @@ spring:
         dialect: org.hibernate.community.dialect.SQLiteDialect
   ai:
     openai:
-      api-key: ${NCBOT_API_KEY:default-key}
-      base-url: ${NCBOT_OPENAI_BASE_URL:http://192.168.1.240:11435/v1}
+      api-key: default-key
+      base-url: http://192.168.1.240:11435/v1
       chat:
         options:
-          model: ${NCBOT_MODEL:ncbot}
+          model: ncbot
 
 ncbot:
   system-prompt: |
     You are ncbot, an AI assistant on the Meshcore mesh network.
-    You are tasked to respond to the user message in a short and concise way.
-    Your entire response should be no more than 128 UTF-8 bytes in length.
+    You are tasked to respond to the last user message in a short and concise way.
+    Your entire response should be ≤128 UTF-8 bytes in length.
     Use emojis to save bytes.
     Tag users as @[username] (e.g. @[nc1v])
     Do not prefix your response with your name.
     Use the available tools to help you.
-    Use the provided conversation memory and latest messages to help you respond as a participant in the conversation.
+    You do not need to respond to every message. Respond only with EMPTY if you don't need to respond.
+    You will receive three sets of information:
+    1. CHAT_MEMORY: a list of key-value pairs (key=value with one on each line) of the existing memory state
+    2. CHAT_MESSAGES: Latest conversation messages
+    3. ADDITIONAL_CONTEXT: Additional information to help you
   condense-prompt: |
-    Condense the following response to ≤128 UTF-8 bytes.
-    Preserve meaning; cut filler.
-    Response should only be the shorted response with nothing else.
+    Condense RESPONSE to be ≤128 UTF-8 bytes.
   memory-prompt: |
-    Your task is to summarize the provided conversation history.
-    The summary that is produced will be used by ncbot as its long term memory.
-  combine-prompt: |
-    You are an expert at combining historical conversation memory with new information.
-    You will be provided the historical conversation memory followed by a summary of new information.
-    Your response should be an updated conversation memory that contains important information from both.
-    You can assume the new information comes after the historical memory.
-    The only time you should omit information is when it is no longer relevant or has been superseded by later information.
-    You may return the historical conversation memory when nothing should be changed.
-  memory-update-cron: ${NCBOT_MEMORY_UPDATE_CRON:3 0 * * *}
-  minimum-response-ms: ${NCBOT_MINIMUM_RESPONSE_MS:0}
-  max-reply-bytes: ${NCBOT_MAX_REPLY_BYTES:128}
+    You are a memory merge system that manages the long term memory of ncbot.
+    You will receive two sets of information:
+    1. CHAT_MEMORY: a list of key-value pairs (key=value with one on each line) of the existing memory state
+    2. CHAT_MESSAGES: Latest conversation messages
+  
+    Output ONLY a list of key-value pairs (key=value with one on each line) representing new or changed facts or facts to be removed.
+    Output only the value EMPTY if nothing meaningful changed.
+    Do not include conversational filler, greetings, or temporary states.
+    Do not include any explanation, markdown, or backticks — raw key-value pairs only.
+    Values should be set to null if the entry should be removed or deleted.
+    New entries should have a good lower camel case name followed by the value being a good description of the value that should be enough for the bot to figure out what to do when provided these key value pairs.
+
+    Focus on:
+    - User preferences and nicknames
+    - Bot behavior rules set by users
+    - Permissions granted or revoked
+    - Ongoing jokes, rivalries, or running gags
+    - Any named configuration or state
+    - Decisions made
+    - Information that is not widely known
+  memory-update-period: 30m
+  memory-partition-size: 100
+  minimum-response-ms: 0
+  max-reply-bytes: 128
   allowed-channels:
     - "#ncbot"
   allow-dms: true
 
 gg:
   jte:
-    development-mode: ${JTE_DEV_MODE:false}
+    development-mode: false
     use-precompiled-templates: true
 
 logging:
