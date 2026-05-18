@@ -4,7 +4,6 @@
 @param ChatRequest request
 @param String response
 
-REQUEST:
-${request.senderKey()}: ${request.messageText()}
+REQUEST: ${request.messageText()}
 RESPONSE: ${response}
-LENGTH: ${response.getBytes(StandardCharsets.UTF_8).length} bytes
+LENGTH: ${response.getBytes(StandardCharsets.UTF_8).length} UTF-8 bytes
