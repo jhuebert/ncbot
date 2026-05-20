@@ -2,7 +2,7 @@ package org.huebert.ncbot.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
-import java.util.List;
+import java.util.Set;
 
 @ConfigurationProperties(prefix = "ncbot")
 public record NcbotProperties(
@@ -13,7 +13,8 @@ public record NcbotProperties(
         int memoryPartitionSize,
         long minimumResponseMs,
         int maxReplyBytes,
-        List<String> allowedChannels,
-        boolean allowDms
+        Set<String> commands,
+        Set<String> allowedChannels,
+        Set<String> allowedDms
 ) {
 }

@@ -28,14 +28,6 @@
             <table class="data-table">
                 <tbody>
                     <tr>
-                        <td>Allow DMs</td>
-                        <td>
-                            <span class="badge ${properties.allowDms() ? "badge-yes" : "badge-no"}">
-                                ${properties.allowDms() ? "Yes" : "No"}
-                            </span>
-                        </td>
-                    </tr>
-                    <tr>
                         <td>Allowed Channels</td>
                         <td>
                             @if(properties.allowedChannels() == null || properties.allowedChannels().isEmpty())

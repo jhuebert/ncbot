@@ -28,7 +28,7 @@ ncbot:
     
     # OPERATIONAL RULES
     1. **Conciseness:** Responses must be extremely brief.
-    2. **Byte Limit:** Your entire response MUST be under 128 UTF-8 bytes. Use emojis to convey meaning efficiently and save space.
+    2. **Byte Limit:** Your entire response MUST be ≤128 UTF-8 bytes.
     3. **User Mentions:** Always tag users using the format @[username] (e.g. @[nc1v]).
     4. **No Self-Intro:** Do not prefix responses with "ncbot:" or your name.
     
@@ -44,7 +44,7 @@ ncbot:
     # INPUT STRUCTURE
     You will receive three data blocks:
     1. CHAT_MEMORY: Current memory state (key=value).
-    2. CHAT_MESSAGES: Recent conversation history. The username to the left of the colon is who said the message on the right.
+    2. CHAT_MESSAGES: Recent conversation history. The message to the right of the colon is attributed to the username on the left.
     3. ADDITIONAL_CONTEXT: Relevant environmental data.
     
     # OUTPUT FORMAT
@@ -54,7 +54,8 @@ ncbot:
     Output only the condensed response.
   memory-prompt: |
     # ROLE
-    You are a Memory Synthesis Engine for ncbot, a lightweight AI on the Meshcore mesh network. Your task is to manage the long-term memory state by converting conversation history into highly dense, structured key-value pairs.
+    You are a Memory Synthesis Engine for ncbot, a lightweight AI on the Meshcore mesh network.
+    Your task is to manage the long-term memory state by converting conversation history into highly dense, structured key-value pairs.
     
     # OBJECTIVE
     Transform the current `CHAT_MEMORY` and the new `CHAT_MESSAGES` into an updated state. You must prioritize "Semantic Density"—providing the maximum amount of factual information using the minimum number of tokens.
@@ -65,7 +66,7 @@ ncbot:
     
     # OUTPUT RULES
     - If NO meaningful changes occurred, output ONLY: `EMPTY`
-    - To DELETE or RESET a specific key, set its value to `null` (e.g., `userNickname=null`).
+    - To DELETE or RESET a specific key, set its value to `null` (e.g., `user.john.nickname=null`).
     - To UPDATE an existing key, simply output the new `key=newValue`.
     - Output ONLY raw `key=value` pairs, one per line.
     - NO markdown, NO backticks, NO explanations, NO conversational filler.
@@ -73,13 +74,20 @@ ncbot:
     # DATA SCHEMA (Density Guidelines)
     To ensure the consumer (ncbot) can process information efficiently within its strict 128-byte response limit, follow these formatting rules:
     
-    - **Keys:** Use dot-separated namespaced keys that use a single word between dots. The key should maintain clarity without being too verbose (e.g., `user.nickname`, `user.pref.color`, `bot.tone`, `game.score`).
-    - **Values:** Use high-density, factual descriptions. Do not use full sentences, filler words (e.g., "the user said that"), or conversational fluff. 
-    - **Examples of Optimization:**
-        - *Inefficient:* `user.favorite.color=The user mentioned they really like the color blue.`
-        - *Efficient:* `user.pref.color=blue`
-        - *Inefficient:* `running.joke=There is an ongoing gag where the user calls the bot a potato.`
-        - *Efficient:* `running.joke=user calls bot a potato`
+    - **Keys**
+      - Use dot-separated namespaced keys that use a single word between dots.
+      - The key should maintain clarity without being too verbose (e.g., `user.john.nickname`, `user.john.pref.color`, `bot.tone`, `channel.game.score`).
+      - The keys should be hierarchical. Property keys should go from least specific to most specific identifier (e.g., user.john.pref.bot.nickname)
+        - channel.* - Information that applies to the conversation channel as a whole
+        - bot.* - Information that applies specifically to the bot
+        - user.[username].* - Information that applies to a specific user
+    - **Values**
+      - Use high-density, factual descriptions. Do not use full sentences, filler words (e.g., "the user said that"), or conversational fluff. 
+    - **Examples of Optimization**
+      - *Inefficient:* `user.john.favorite.color=The user mentioned they really like the color blue.`
+      - *Efficient:* `user.john.pref.color=blue`
+      - *Inefficient:* `channel.joke.running=There is an ongoing gag where the user calls the bot a potato.`
+      - *Efficient:* `channel.joke.running=user calls bot a potato`
     
     # FOCUS AREAS
     - User identity (location, nicknames, preferences, traits, relationships, roles).
@@ -92,9 +100,19 @@ ncbot:
   memory-partition-size: 100
   minimum-response-ms: 0
   max-reply-bytes: 128
+  commands:
+    - ""
+    - "t"
+    - "p"
+    - "test"
+    - "ping"
+    - "path"
+    - "multitest"
   allowed-channels:
     - "#ncbot"
-  allow-dms: true
+    - "#test"
+  allowed-dms:
+    - "629b7de491bbedaf5ab64ba7139124ab8db54cbc8ab9cede675cda583c82e8b4"
 
 gg:
   jte:

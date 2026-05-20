@@ -66,10 +66,6 @@
                     <td>${properties.maxReplyBytes()}</td>
                 </tr>
                 <tr>
-                    <td>Allow DMs</td>
-                    <td>${properties.allowDms()}</td>
-                </tr>
-                <tr>
                     <td>Allowed Channels</td>
                     <td>${properties.allowedChannels() == null || properties.allowedChannels().isEmpty() ? "All channels" : properties.allowedChannels().size() + " channels"}</td>
                 </tr>

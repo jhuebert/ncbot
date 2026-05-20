@@ -21,6 +21,6 @@ public class TemplateService {
         TemplateOutput output = new StringOutput();
         templateEngine.render("prompts/" + template + ".jte", model, output);
         log.debug("render result: {}", output);
-        return output.toString();
+        return output.toString().trim();
     }
 }

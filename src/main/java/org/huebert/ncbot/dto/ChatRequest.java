@@ -4,7 +4,7 @@ public record ChatRequest(
         String senderName,
         String senderKey,
         String messageText,
-        Boolean isDm,
+        boolean isDm,
         String channelKey,
         String channelName,
         Long senderTimestamp,

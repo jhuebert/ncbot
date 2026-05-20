@@ -20,6 +20,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -60,20 +62,17 @@ public class ChatService {
             return EMPTY_RESPONSE;
         }
 
-        if (Boolean.TRUE.equals(request.isDm())) {
-            if (!properties.allowDms()) {
-                log.debug("Skipping DM — DMs not allowed");
+        if (request.isDm()) {
+            Set<String> allowed = properties.allowedDms();
+            if ((allowed == null) || (request.senderKey() == null) || !allowed.contains(request.senderKey())) {
+                log.debug("Skipping DM {} — not in allowed list", request.senderKey());
                 return EMPTY_RESPONSE;
             }
-        }
-
-        if (Boolean.FALSE.equals(request.isDm())) {
-            List<String> allowed = properties.allowedChannels();
-            if (allowed != null && !allowed.isEmpty()) {
-                if (request.channelName() == null || !allowed.contains(request.channelName())) {
-                    log.debug("Skipping channel {} — not in allowed list", request.channelName());
-                    return EMPTY_RESPONSE;
-                }
+        } else {
+            Set<String> allowed = properties.allowedChannels();
+            if ((allowed == null) || (request.channelName() == null) || !allowed.contains(request.channelName())) {
+                log.debug("Skipping channel {} — not in allowed list", request.channelName());
+                return EMPTY_RESPONSE;
             }
         }
 
@@ -85,7 +84,8 @@ public class ChatService {
                             .isDm(request.isDm())
                             .memoryUpdatedAt(Instant.EPOCH)
                             .build()));
-            String response = invokeModel(chatChannel, request);
+            String response = generateStandardResponse(chatChannel, request)
+                    .orElseGet(() -> invokeModel(chatChannel, request));
             saveInteraction(chatChannel, request, response);
             log.debug("processMessage result: {}", response);
             return new ChatResponse(List.of(response));
@@ -93,6 +93,20 @@ public class ChatService {
             log.error("Error processing message: {}", e.getMessage(), e);
             return EMPTY_RESPONSE;
         }
+    }
+
+    private Optional<String> generateStandardResponse(ChatChannel chatChannel, ChatRequest request) {
+        String message = Optional.ofNullable(request.messageText())
+                .map(String::trim)
+                .map(String::toLowerCase)
+                .orElse("");
+        if (properties.commands().contains(message)) {
+            log.debug("generateStandardResponse: {}", message);
+            return Optional.of(templateService.render("standard", Map.of(
+                    "request", request
+            )));
+        }
+        return Optional.empty();
     }
 
     private void saveInteraction(ChatChannel chatChannel, ChatRequest request, String response) {
