@@ -112,7 +112,6 @@ ncbot:
     - "#ncbot"
     - "#test"
   allowed-dms:
-    - "629b7de491bbedaf5ab64ba7139124ab8db54cbc8ab9cede675cda583c82e8b4"
 
 gg:
   jte:

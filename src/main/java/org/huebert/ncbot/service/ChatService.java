@@ -64,7 +64,7 @@ public class ChatService {
 
         if (request.isDm()) {
             Set<String> allowed = properties.allowedDms();
-            if ((allowed == null) || (request.senderKey() == null) || !allowed.contains(request.senderKey())) {
+            if ((allowed != null) && !allowed.isEmpty() && ((request.senderKey() == null) || !allowed.contains(request.senderKey()))) {
                 log.debug("Skipping DM {} — not in allowed list", request.senderKey());
                 return EMPTY_RESPONSE;
             }
