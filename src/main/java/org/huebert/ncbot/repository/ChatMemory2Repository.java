@@ -11,7 +11,7 @@ public interface ChatMemory2Repository extends JpaRepository<ChatMemory, Long> {
     @Query("""
             SELECT m
             FROM ChatMemory m
-            WHERE m.chatChannelId = :chatChannelId
+            WHERE m.chatChannelId = :chatChannelId OR m.chatChannelId IS NULL
             ORDER BY m.key ASC
             """)
     List<ChatMemory> findMemory(Long chatChannelId);

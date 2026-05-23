@@ -20,7 +20,7 @@ public class ChatMemory {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "chat_channel_id", nullable = false)
+    @Column(name = "chat_channel_id")
     private Long chatChannelId;
 
     @Column(name = "key_text", nullable = false)

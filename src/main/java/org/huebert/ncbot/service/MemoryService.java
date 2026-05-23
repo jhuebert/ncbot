@@ -101,7 +101,7 @@ public class MemoryService {
                             .value(entry.getValue())
                             .build());
                 }
-            } else {
+            } else if (memory.getChatChannelId() != null) {
                 if (DELETE_VALUE.equalsIgnoreCase(entry.getValue())) {
                     // Deleted
                     log.debug("deleting memory: {}", entry);

@@ -25,11 +25,11 @@ public class WeatherTool {
         log.debug("getCurrentWeather: latitude={}, longitude={}", latitude, longitude);
         WeatherToolResponse result = weatherService.getWeather(latitude, longitude)
                 .map(r -> WeatherToolResponse.builder()
-                        .conditionsDescription(WeatherCode.fromCode(r.current().weatherCode()).getDescription())
-                        .temperatureFahrenheit(getTemperature(r))
-                        .humidityPercent(r.current().relativeHumidity2m())
-                        .windSpeedMilesPerHour(getWindSpeed(r))
-                        .windDirectionDegrees(r.current().windDirection10m())
+                        .conditions(WeatherCode.fromCode(r.current().weatherCode()).getDescription())
+                        .temperature(getTemperature(r))
+                        .humidity(r.current().relativeHumidity2m())
+                        .windSpeed(getWindSpeed(r))
+                        .windDirection(r.current().windDirection10m())
                         .build())
                 .orElse(null);
         log.debug("getCurrentWeather result: {}", result);

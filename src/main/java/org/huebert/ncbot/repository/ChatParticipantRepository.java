@@ -19,7 +19,8 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
     @Query("""
             SELECT p
             FROM ChatParticipant p
-            WHERE LOWER(p.name) LIKE :name
+            WHERE LOWER(p.name) LIKE LOWER(:name)
+            ORDER BY p.name
             """)
     List<ChatParticipant> searchParticipants(String name);
 

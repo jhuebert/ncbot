@@ -2,10 +2,12 @@ package org.huebert.ncbot.tool;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.logging.log4j.util.Strings;
+import org.huebert.ncbot.entity.ChatParticipant;
 import org.huebert.ncbot.repository.ChatChannelRepository;
 import org.huebert.ncbot.repository.ChatParticipantRepository;
-import org.huebert.ncbot.tool.dto.ToolParticipant;
 import org.springframework.ai.tool.annotation.Tool;
+import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -27,19 +29,22 @@ public class ChatTool {
         return channels;
     }
 
-//    @Tool(description = "Get information about a Meshcore users")
-//    public List<ToolParticipant> findUsers(String search) {
-//        log.debug("findUsers: {}", search);
-//        List<ToolParticipant> participants = chatParticipantRepository.searchParticipants('%' + search + '%').stream()
-//                .map(p -> {
-//                    return ToolParticipant.builder()
-//                            .name(p.getName())
-//                            .lastSeen(p.getLastSeen())
-//                            .build();
-//                })
-//                .toList();
-//        log.debug("findUsers result: {}", participants);
-//        return participants;
-//    }
+    @Tool(description = "Searches Meshcore users")
+    public List<String> searchUsers(
+            @ToolParam(description = "Search string that returned user names must contain. Use empty or null to get all users.") String search
+    ) {
+        log.debug("findUsers: {}", search);
+        List<ChatParticipant> chatParticipants;
+        if (Strings.isNotBlank(search)) {
+            chatParticipants = chatParticipantRepository.searchParticipants('%' + search.trim() + '%');
+        } else {
+            chatParticipants = chatParticipantRepository.findAll();
+        }
+        List<String> participants = chatParticipants.stream()
+                .map(ChatParticipant::getName)
+                .toList();
+        log.debug("findUsers result: {}", participants);
+        return participants;
+    }
 
 }

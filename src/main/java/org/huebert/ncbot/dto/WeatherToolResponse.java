@@ -1,14 +1,14 @@
 package org.huebert.ncbot.dto;
 
+import com.fasterxml.jackson.annotation.JsonPropertyDescription;
 import lombok.Builder;
-import lombok.Data;
 
-@Data
 @Builder
-public class WeatherToolResponse {
-    private final Integer temperatureFahrenheit;
-    private final Integer windSpeedMilesPerHour;
-    private final Integer windDirectionDegrees;
-    private final Integer humidityPercent;
-    private final String conditionsDescription;
+public record WeatherToolResponse(
+        @JsonPropertyDescription("Current temperature in Fahrenheit") Integer temperature,
+        @JsonPropertyDescription("Current wind speed in miles per hour") Integer windSpeed,
+        @JsonPropertyDescription("Current wind direction azimuth in degrees") Integer windDirection,
+        @JsonPropertyDescription("Current humidity percent. Value from 0-100") Integer humidity,
+        @JsonPropertyDescription("Current conditions description") String conditions
+) {
 }
