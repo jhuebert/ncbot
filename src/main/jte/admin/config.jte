@@ -30,15 +30,7 @@
                     <tr>
                         <td>Allowed Channels</td>
                         <td>
-                            @if(properties.allowedChannels() == null || properties.allowedChannels().isEmpty())
-                                <span class="badge badge-info">All channels</span>
-                            @else
-                                <div class="channel-list">
-                                @for(String ch : properties.allowedChannels())
-                                    <span class="badge badge-channel mono">${ch}</span>
-                                @endfor
-                                </div>
-                            @endif
+
                         </td>
                     </tr>
                 </tbody>

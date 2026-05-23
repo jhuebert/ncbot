@@ -96,9 +96,11 @@ ncbot:
     - Persistent states (scores, settings, decisions made).
     - Non-obvious information (facts not widely known in the chat).
     - Important decisions made
+  welcome-content:
+  condense: true
   memory-update-period: 30m
   memory-partition-size: 100
-  minimum-response-ms: 0
+  minimum-response-ms: 3000
   max-reply-bytes: 128
   commands:
     - ""
@@ -108,9 +110,11 @@ ncbot:
     - "ping"
     - "path"
     - "multitest"
-  allowed-channels:
-    - "#ncbot"
-    - "#test"
+  channels:
+    - name: "#ncbot"
+      ai: true
+      welcome: true
+      command: true
   allowed-dms:
 
 gg:

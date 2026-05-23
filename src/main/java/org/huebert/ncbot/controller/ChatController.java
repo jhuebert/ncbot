@@ -33,6 +33,7 @@ public class ChatController {
 
         long delay = ncbotProperties.minimumResponseMs() - (System.currentTimeMillis() - start);
         if (delay > 0) {
+            log.debug("delaying {} ms", delay);
             Delay.sleep(delay);
         }
 

@@ -1,5 +1,6 @@
 package org.huebert.ncbot.service;
 
+import com.google.common.base.Utf8;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.huebert.ncbot.config.NcbotProperties;
@@ -8,9 +9,11 @@ import org.huebert.ncbot.dto.ChatResponse;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatMemory;
 import org.huebert.ncbot.entity.ChatMessage;
+import org.huebert.ncbot.entity.ChatParticipant;
 import org.huebert.ncbot.repository.ChatChannelRepository;
 import org.huebert.ncbot.repository.ChatMemory2Repository;
 import org.huebert.ncbot.repository.ChatMessageRepository;
+import org.huebert.ncbot.repository.ChatParticipantRepository;
 import org.huebert.ncbot.tool.WeatherTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -35,6 +38,7 @@ public class ChatService {
     private final ChatChannelRepository chatChannelRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final ChatMemory2Repository chatMemoryRepository;
+    private final ChatParticipantRepository chatParticipantRepository;
 
     public ChatService(ChatModel chatModel,
                        ChatMessageRepository chatMessageRepository,
@@ -42,13 +46,15 @@ public class ChatService {
                        WeatherTool weatherTool,
                        TemplateService templateService,
                        ChatChannelRepository chatChannelRepository,
-                       ChatMemory2Repository chatMemoryRepository
+                       ChatMemory2Repository chatMemoryRepository,
+                       ChatParticipantRepository chatParticipantRepository
     ) {
         this.chatMessageRepository = chatMessageRepository;
         this.properties = properties;
         this.templateService = templateService;
         this.chatChannelRepository = chatChannelRepository;
         this.chatMemoryRepository = chatMemoryRepository;
+        this.chatParticipantRepository = chatParticipantRepository;
         this.chatClient = ChatClient.builder(chatModel)
                 .defaultTools(weatherTool)
                 .build();
@@ -58,65 +64,43 @@ public class ChatService {
         log.debug("processMessage: {}", request);
 
         if (Boolean.TRUE.equals(request.isOutgoing())) {
-            log.debug("Skipping outgoing message from {}", request.senderName());
+            log.debug("skipping outgoing message");
             return EMPTY_RESPONSE;
         }
 
-        if (request.isDm()) {
-            Set<String> allowed = properties.allowedDms();
-            if ((allowed != null) && !allowed.isEmpty() && ((request.senderKey() == null) || !allowed.contains(request.senderKey()))) {
-                log.debug("Skipping DM {} — not in allowed list", request.senderKey());
-                return EMPTY_RESPONSE;
-            }
-        } else {
-            Set<String> allowed = properties.allowedChannels();
-            if ((allowed == null) || (request.channelName() == null) || !allowed.contains(request.channelName())) {
-                log.debug("Skipping channel {} — not in allowed list", request.channelName());
-                return EMPTY_RESPONSE;
-            }
-        }
-
         try {
-            ChatChannel chatChannel = chatChannelRepository.findChannel(request.isDm(), request.isDm() ? request.senderKey() : request.channelKey())
-                    .orElseGet(() -> chatChannelRepository.saveAndFlush(ChatChannel.builder()
-                            .channelKey(request.isDm() ? request.senderKey() : request.channelKey())
-                            .channelName(request.isDm() ? request.senderName() : request.channelName())
-                            .isDm(request.isDm())
-                            .memoryUpdatedAt(Instant.EPOCH)
-                            .build()));
-            String response = generateStandardResponse(chatChannel, request)
-                    .orElseGet(() -> invokeModel(chatChannel, request));
-            saveInteraction(chatChannel, request, response);
-            log.debug("processMessage result: {}", response);
-            return new ChatResponse(List.of(response));
+            ChatChannel chatChannel = getChatChannel(request);
+            Optional<String> response = generateResponse(chatChannel, request);
+            saveInteraction(chatChannel, request, response.orElse(null));
+            return response
+                    .map(r -> truncateUtf8(r, properties.maxReplyBytes()))
+                    .map(r -> new ChatResponse(List.of(r)))
+                    .orElse(EMPTY_RESPONSE);
         } catch (Exception e) {
             log.error("Error processing message: {}", e.getMessage(), e);
             return EMPTY_RESPONSE;
         }
     }
 
-    private Optional<String> generateStandardResponse(ChatChannel chatChannel, ChatRequest request) {
-        String message = Optional.ofNullable(request.messageText())
-                .map(String::trim)
-                .map(String::toLowerCase)
-                .orElse("");
-        if (properties.commands().contains(message)) {
-            log.debug("generateStandardResponse: {}", message);
-            return Optional.of(templateService.render("standard", Map.of(
-                    "request", request
-            )));
-        }
-        return Optional.empty();
+    private ChatChannel getChatChannel(ChatRequest request) {
+        return chatChannelRepository.findChannel(request.isDm(), request.isDm() ? request.senderKey() : request.channelKey())
+                .orElseGet(() -> chatChannelRepository.saveAndFlush(ChatChannel.builder()
+                        .channelKey(request.isDm() ? request.senderKey() : request.channelKey())
+                        .channelName(request.isDm() ? request.senderName() : request.channelName())
+                        .isDm(request.isDm())
+                        .memoryUpdatedAt(Instant.EPOCH)
+                        .build()));
     }
 
     private void saveInteraction(ChatChannel chatChannel, ChatRequest request, String response) {
+        log.debug("saveInteraction: request={}, response={}", request.messageText(), response);
         chatMessageRepository.save(ChatMessage.builder()
                 .chatChannelId(chatChannel.getId())
                 .content(request.messageText())
                 .createdAt(Instant.now())
                 .senderName(request.senderName())
                 .build());
-        if (Strings.trimToNull(response) != null) {
+        if (response != null) {
             chatMessageRepository.save(ChatMessage.builder()
                     .chatChannelId(chatChannel.getId())
                     .content(response)
@@ -126,8 +110,67 @@ public class ChatService {
         }
     }
 
-    private String invokeModel(ChatChannel chatChannel, ChatRequest request) {
-        log.debug("invokeModel: {}", request);
+    private Optional<String> generateResponse(ChatChannel chatChannel, ChatRequest request) {
+        log.debug("generateResponse: chatChannel={}, request={}", chatChannel, request);
+
+        NcbotProperties.ChannelProperties channelProperties;
+        if (request.isDm()) {
+            Set<String> allowed = properties.allowedDms();
+            if ((allowed != null) && !allowed.isEmpty() && ((request.senderKey() == null) || !allowed.contains(request.senderKey()))) {
+                log.debug("skipping DM {}", request.senderKey());
+                return Optional.empty();
+            }
+            channelProperties = new NcbotProperties.ChannelProperties(request.senderName(), true, false, true);
+        } else {
+            channelProperties = properties.channels().stream()
+                    .filter(a -> a.name().equals(request.channelName()))
+                    .findFirst()
+                    .orElse(null);
+            if (channelProperties == null) {
+                log.debug("skipping channel {}", request.channelName());
+                return Optional.empty();
+            }
+        }
+
+        ChatParticipant participant = chatParticipantRepository.findParticipant(request.senderName()).orElse(null);
+        if (participant != null) {
+            participant.setLastSeen(Instant.now());
+            chatParticipantRepository.save(participant);
+        } else {
+            log.debug("new participant {}", request.senderName());
+            chatParticipantRepository.save(ChatParticipant.builder()
+                    .name(request.senderName())
+                    .lastSeen(Instant.now())
+                    .build());
+            if (channelProperties.welcome()) {
+                log.debug("sending welcome to {}", request.senderName());
+                return Optional.of(templateService.render("welcome", Map.of(
+                        "request", request,
+                        "welcomeContent", properties.welcomeContent()
+                )));
+            }
+        }
+
+        String message = Optional.ofNullable(request.messageText())
+                .map(String::trim)
+                .map(String::toLowerCase)
+                .orElse("");
+        if (channelProperties.command() && properties.commands().contains(message)) {
+            log.debug("command {}", message);
+            return Optional.of(templateService.render("standard", Map.of(
+                    "request", request
+            )));
+        }
+
+        if (channelProperties.ai()) {
+            return invokeAi(chatChannel, request);
+        }
+
+        return Optional.empty();
+    }
+
+    private Optional<String> invokeAi(ChatChannel chatChannel, ChatRequest request) {
+        log.debug("invokeAi: {}", request);
 
         List<ChatMessage> messages = chatMessageRepository.findChannelMessages(chatChannel.getId(), chatChannel.getMemoryUpdatedAt(), Instant.now());
         List<ChatMemory> memories = chatMemoryRepository.findMemory(chatChannel.getId());
@@ -146,20 +189,19 @@ public class ChatService {
                 .content();
 
         if ("EMPTY".equalsIgnoreCase(Strings.trimToNull(response))) {
-            return "";
+            return Optional.empty();
         }
 
-        return ensureByteLimit(request, response);
+        return condense(request, response);
     }
 
-    private String ensureByteLimit(ChatRequest request, String response) {
-        log.debug("ensureByteLimit: {}", response);
+    private Optional<String> condense(ChatRequest request, String response) {
+        log.debug("condense: {}", response);
 
-        if (response.getBytes(StandardCharsets.UTF_8).length <= properties.maxReplyBytes()) {
-            log.debug("ensureByteLimit result: {}", response);
-            return response;
+        if (!properties.condense() || (Utf8.encodedLength(response) <= properties.maxReplyBytes())) {
+            log.debug("condense result: no change {}", response);
+            return Optional.of(response);
         }
-
 
         String output = templateService.render("condense", Map.of(
                 "request", request,
@@ -172,8 +214,23 @@ public class ChatService {
                 .call()
                 .content();
 
-        log.debug("ensureByteLimit result: {}", condensed);
-        return condensed;
+        log.debug("condense result: consensed {}", condensed);
+        return Optional.ofNullable(condensed);
+    }
+
+    public static String truncateUtf8(String text, int maxBytes) {
+
+        if (Utf8.encodedLength(text) <= maxBytes) {
+            return text;
+        }
+
+        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+        int limit = maxBytes - 3;
+        while ((bytes[limit] & 0xC0) == 0x80) {
+            limit--;
+        }
+
+        return new String(bytes, 0, limit, StandardCharsets.UTF_8) + "...";
     }
 
 }

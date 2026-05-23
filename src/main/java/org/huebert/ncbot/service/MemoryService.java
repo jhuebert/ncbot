@@ -52,6 +52,21 @@ public class MemoryService {
         for (ChatChannel channel : chatChannelRepository.findAll()) {
             log.debug("channel: {}", channel);
 
+            if (!channel.getIsDm()) {
+                NcbotProperties.ChannelProperties channelProperties = ncbotProperties.channels().stream()
+                        .filter(a -> a.name().equals(channel.getChannelName()))
+                        .findFirst()
+                        .orElse(null);
+                if (channelProperties == null) {
+                    log.debug("no properties for channel {}", channel.getChannelName());
+                    continue;
+                }
+                if (!channelProperties.ai()) {
+                    log.debug("ai not enabled for channel {}", channel.getChannelName());
+                    continue;
+                }
+            }
+
             List<ChatMessage> messages = chatMessageRepository.findChannelMessages(channel.getId(), channel.getMemoryUpdatedAt(), now);
             log.debug("messages count: {}", messages.size());
             if (messages.isEmpty()) {
