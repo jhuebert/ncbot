@@ -4,6 +4,7 @@ import org.huebert.ncbot.entity.ChatParticipant;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.List;
 import java.util.Optional;
 
 public interface ChatParticipantRepository extends JpaRepository<ChatParticipant, Long> {
@@ -14,5 +15,12 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
             WHERE p.name = :name
             """)
     Optional<ChatParticipant> findParticipant(String name);
+
+    @Query("""
+            SELECT p
+            FROM ChatParticipant p
+            WHERE LOWER(p.name) LIKE :name
+            """)
+    List<ChatParticipant> searchParticipants(String name);
 
 }

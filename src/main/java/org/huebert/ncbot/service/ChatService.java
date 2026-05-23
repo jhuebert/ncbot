@@ -14,6 +14,7 @@ import org.huebert.ncbot.repository.ChatChannelRepository;
 import org.huebert.ncbot.repository.ChatMemory2Repository;
 import org.huebert.ncbot.repository.ChatMessageRepository;
 import org.huebert.ncbot.repository.ChatParticipantRepository;
+import org.huebert.ncbot.tool.ChatTool;
 import org.huebert.ncbot.tool.WeatherTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -44,6 +45,7 @@ public class ChatService {
                        ChatMessageRepository chatMessageRepository,
                        NcbotProperties properties,
                        WeatherTool weatherTool,
+                       ChatTool chatTool,
                        TemplateService templateService,
                        ChatChannelRepository chatChannelRepository,
                        ChatMemory2Repository chatMemoryRepository,
@@ -56,7 +58,7 @@ public class ChatService {
         this.chatMemoryRepository = chatMemoryRepository;
         this.chatParticipantRepository = chatParticipantRepository;
         this.chatClient = ChatClient.builder(chatModel)
-                .defaultTools(weatherTool)
+                .defaultTools(weatherTool, chatTool)
                 .build();
     }
 
@@ -68,18 +70,13 @@ public class ChatService {
             return EMPTY_RESPONSE;
         }
 
-        try {
-            ChatChannel chatChannel = getChatChannel(request);
-            Optional<String> response = generateResponse(chatChannel, request);
-            saveInteraction(chatChannel, request, response.orElse(null));
-            return response
-                    .map(r -> truncateUtf8(r, properties.maxReplyBytes()))
-                    .map(r -> new ChatResponse(List.of(r)))
-                    .orElse(EMPTY_RESPONSE);
-        } catch (Exception e) {
-            log.error("Error processing message: {}", e.getMessage(), e);
-            return EMPTY_RESPONSE;
-        }
+        ChatChannel chatChannel = getChatChannel(request);
+        Optional<String> response = generateResponse(chatChannel, request);
+        saveInteraction(chatChannel, request, response.orElse(null));
+        return response
+                .map(r -> truncateUtf8(r, properties.maxReplyBytes()))
+                .map(r -> new ChatResponse(List.of(r)))
+                .orElse(EMPTY_RESPONSE);
     }
 
     private ChatChannel getChatChannel(ChatRequest request) {

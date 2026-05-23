@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @Slf4j
 @RequiredArgsConstructor
 @RestController
@@ -26,17 +28,20 @@ public class ChatController {
     @PostMapping("/chat")
     public ResponseEntity<ChatResponse> chat(@RequestBody ChatRequest request) {
         long start = System.currentTimeMillis();
-
-        log.debug("request: {}", request);
-        ChatResponse response = chatService.processMessage(request);
-        log.debug("response: {}", response);
-
-        long delay = ncbotProperties.minimumResponseMs() - (System.currentTimeMillis() - start);
-        if (delay > 0) {
-            log.debug("delaying {} ms", delay);
-            Delay.sleep(delay);
+        try {
+            log.debug("request: {}", request);
+            ChatResponse response = chatService.processMessage(request);
+            log.debug("response: {}", response);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            log.error("Error processing message: {}", e.getMessage(), e);
+            return ResponseEntity.ok(new ChatResponse(List.of()));
+        } finally {
+            long delay = ncbotProperties.minimumResponseMs() - (System.currentTimeMillis() - start);
+            if (delay > 0) {
+                log.debug("delaying {} ms", delay);
+                Delay.sleep(delay);
+            }
         }
-
-        return ResponseEntity.ok(response);
     }
 }
