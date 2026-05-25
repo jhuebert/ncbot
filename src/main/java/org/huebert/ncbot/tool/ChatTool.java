@@ -3,6 +3,7 @@ package org.huebert.ncbot.tool;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
+import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatParticipant;
 import org.huebert.ncbot.repository.ChatChannelRepository;
 import org.huebert.ncbot.repository.ChatParticipantRepository;
@@ -24,7 +25,9 @@ public class ChatTool {
     @Tool(description = "Get known Meshcore channels")
     public List<String> getKnownChannels() {
         log.debug("getKnownChannels");
-        List<String> channels = chatChannelRepository.findPublicChannels();
+        List<String> channels = chatChannelRepository.findPublicChannels().stream()
+                .map(ChatChannel::getChannelName)
+                .toList();
         log.debug("getKnownChannels result: {}", channels);
         return channels;
     }

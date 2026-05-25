@@ -24,4 +24,11 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
             """)
     List<ChatParticipant> searchParticipants(String name);
 
+    @Query("""
+            SELECT p
+            FROM ChatParticipant p
+            ORDER BY p.lastSeen DESC
+            """)
+    List<ChatParticipant> findLastSeen();
+
 }

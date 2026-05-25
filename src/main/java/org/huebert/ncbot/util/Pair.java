@@ -1,0 +1,4 @@
+package org.huebert.ncbot.util;
+
+public record Pair<K, V>(K key, V value) {
+}

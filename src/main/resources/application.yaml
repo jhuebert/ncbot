@@ -102,14 +102,6 @@ ncbot:
   memory-partition-size: 100
   minimum-response-ms: 3000
   max-reply-bytes: 128
-  commands:
-    - ""
-    - "t"
-    - "p"
-    - "test"
-    - "ping"
-    - "path"
-    - "multitest"
   channels:
     - name: "#ncbot"
       ai: true

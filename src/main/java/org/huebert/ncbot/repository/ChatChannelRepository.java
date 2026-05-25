@@ -17,11 +17,11 @@ public interface ChatChannelRepository extends JpaRepository<ChatChannel, Long> 
     Optional<ChatChannel> findChannel(boolean isDm, String channelKey);
 
     @Query("""
-            SELECT c.channelName
+            SELECT c
             FROM ChatChannel c
             WHERE NOT c.isDm AND c.channelName <> 'Public'
             ORDER BY c.channelName ASC
             """)
-    List<String> findPublicChannels();
+    List<ChatChannel> findPublicChannels();
 
 }
