@@ -18,7 +18,7 @@ import java.util.Set;
 @Component
 public class PathChatHandler implements CommandChatHandler {
 
-    private static final Set<String> COMMANDS = Set.of("path", "m", "multipath");
+    private static final Set<String> COMMANDS = Set.of("path", "m", "multipath", "multitest");
 
     private final NcbotProperties ncbotProperties;
 
