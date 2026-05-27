@@ -11,14 +11,23 @@ RemoteTerm (Python bot)
 ┌──────────────────────────────────────┐
 │           ncbot (Spring Boot)         │
 │                                       │
-│  ChatEndpoint → ChatService           │
+│  ChatController → ChatService         │
 │       │                               │
-│  Message Repository (JPA + SQLite)    │
+│  ChatHandler chain (ordered):         │
+│    • WelcomeChatHandler (new users)   │
+│    • CommandChatHandler (commands)    │
+│    • AiChatHandler (AI responses)     │
+│       │                               │
+│  Repositories (JPA + SQLite):         │
+│    • ChatMessage  • ChatChannel       │
+│    • ChatMemory   • ChatParticipant   │
 │       │                               │
 │  AI Chat Service (Spring AI)          │
 │       │                               │
-│  Tools: Weather, History, ByteCount   │
-│                                       │
+│  Tools: Weather, ChatInfo             │
+│       │                               │
+│  MemoryService (scheduled condense)   │
+│       │                               │
 │  Admin UI (jte templates + MVC)       │
 └──────────────────────────────────────┘
 ```
@@ -26,7 +35,8 @@ RemoteTerm (Python bot)
 ## Prerequisites
 
 - **Docker** — for containerized deployment
-- **OpenAI-compatible AI endpoint** — e.g. [llama.cpp](https://github.com/ggerganov/llama.cpp) server, Ollama, or any OpenAI-compatible API
+- **OpenAI-compatible AI endpoint** — e.g. [Ollama](https://ollama.com/), llama.cpp, or any OpenAI-compatible API
+- **JDK 25** — for local development
 
 ## Quick Start
 
@@ -64,27 +74,44 @@ All configuration is via environment variables or `application.yaml`:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `NCBOT_API_KEY` | `default-key` | API key for the OpenAI-compatible endpoint |
-| `NCBOT_OPENAI_BASE_URL` | `http://localhost:8080` | Base URL for llama.cpp or other OpenAI-compatible server |
-| `NCBOT_MODEL` | `llama3` | Model name/identifier |
-| `NCBOT_TEMPERATURE` | `0.7` | AI temperature (0.0–1.0) |
-| `NCBOT_RESPONSE_DELAY_SECONDS` | `1.5` | Delay before AI processing (0 to disable) |
+| `NCBOT_OPENAI_BASE_URL` | *(from application.yaml)* | Base URL for the AI server |
+| `NCBOT_MODEL` | `ncbot` | Model name/identifier |
+| `NCBOT_MINIMUM_RESPONSE_MS` | `3000` | Minimum response delay in milliseconds (0 to disable) |
 | `NCBOT_MAX_REPLY_BYTES` | `128` | Max UTF-8 bytes per reply message |
-| `NCBOT_HISTORY_LIMIT` | `20` | Number of recent messages to include in AI context |
-| `NCBOT_SYSTEM_PROMPT` | *(built-in default)* | Optional override for the system prompt |
-| `NCBOT_ALLOW_DMS` | `false` | Whether the bot responds to direct messages |
+| `NCBOT_CONDENSE` | `true` | Enable AI-based response condensing when over byte limit |
+| `NCBOT_MEMORY_UPDATE_PERIOD` | `30m` | Scheduled interval for AI memory synthesis |
+| `NCBOT_MEMORY_PARTITION_SIZE` | `100` | Number of messages per memory partition |
+| `NCBOT_WELCOME_CONTENT` | *(empty)* | Welcome message appended for new participants |
 
-### Channel Filtering
+### Channel Configuration
 
-To restrict the bot to specific channels, set allowed channel keys in `application.yaml`:
+Channels are configured in `application.yaml` with per-channel flags:
 
 ```yaml
 ncbot:
-  allowed-channels:
-    - "abc123def456"
-    - "789xyz000111"
+  channels:
+    - name: "#ncbot"
+      ai: true        # Enable AI-generated responses
+      welcome: true   # Send welcome message to new participants
+      command: true   # Enable command handler (help, ping, etc.)
 ```
 
-Leave empty or unset to respond in all channels.
+- **`ai`** — Whether the channel gets AI-generated responses
+- **`welcome`** — Whether new participants receive a welcome message
+- **`command`** — Whether command shortcuts are active in this channel
+
+### DM Access Control
+
+DMs are controlled via a set of allowed sender keys:
+
+```yaml
+ncbot:
+  allowed-dms:
+    - "hex-key-1"
+    - "hex-key-2"
+```
+
+Leave empty or unset to block all DMs. DMs always have `ai: true`, `welcome: true`, and `command: true` enabled.
 
 ## RemoteTerm Setup
 
@@ -94,9 +121,10 @@ The `bot.py` file is the RemoteTerm integration script. It:
 
 1. Receives kwargs from RemoteTerm's bot system
 2. POSTs to ncbot's `/v1/chat` endpoint
-3. Returns the response (string, list of strings, or None)
+3. Returns the response (list of strings, or None)
 
 Key behaviors:
+- **No reply to own messages** — skips messages where `is_outgoing` is true
 - **9-second timeout** — RemoteTerm allows 10 seconds total, leaving 1s margin
 - **Graceful failure** — returns `None` on any error (bot silently fails)
 - **No dependencies** — uses only Python standard library
@@ -118,13 +146,25 @@ RemoteTerm passes these kwargs:
 | `is_outgoing` | Whether this is our own outgoing message |
 | `path_bytes_per_hop` | 1, 2, or 3 (nullable) |
 
-## Database
+## AI Features
 
-SQLite database file lives at `/data/ncbot.db` inside the container. The `docker-compose.yml` mounts `./data:/data` by default.
+### Memory System
 
-- **Persisting data:** Keep the volume mount in docker-compose.yml
-- **Ephemeral storage:** Remove the volume mount
-- **Upgrading:** `docker compose pull && docker compose up -d` — DB persists across upgrades
+ncbot maintains long-term memory per channel using AI-generated key-value pairs. A scheduled task periodically synthesizes conversation history into dense factual records (e.g., `user.john.pref.color=blue`). The memory is included in AI prompts to provide context across sessions.
+
+- **Condensing**: When an AI response exceeds the byte limit, a second AI call condenses it to fit
+- **Partitions**: Memory updates process messages in configurable batches
+- **Storage**: Memories are stored in the `chat_memory` table, scoped to each channel
+
+### Tools
+
+The AI model has access to these tools:
+
+| Tool | Description |
+|------|-------------|
+| `getCurrentWeather` | Get current weather by latitude/longitude (via Open-Meteo). Returns temperature (°F), wind speed (mph), wind direction (°), humidity (%), and conditions. |
+| `getKnownChannels` | List all known Meshcore channels the bot has seen |
+| `searchUsers` | Search for users by name substring |
 
 ## Admin UI
 
@@ -135,6 +175,27 @@ Access at `http://host:8080/admin`:
 | `/admin` | Dashboard — message stats, uptime, channel stats |
 | `/admin/messages` | Message log viewer (paginated) |
 | `/admin/config` | View current configuration |
+
+## Commands
+
+Commands are per-channel (controlled by the `command` flag). They are matched case-insensitively and use single-letter aliases:
+
+| Command | Alias | Response |
+|---------|-------|----------|
+| `help` | `h` | List of available commands |
+| `ping` | `p` | "pong" |
+| `path` | `m` | Hex-encoded routing path decoded into hops |
+| `test` | `t` | Connection info (time, path) |
+| `users` | `u` | List of known users |
+| `channels` | `c` | List of known channels |
+
+## Database
+
+SQLite database file lives at `/data/ncbot.db` inside the container. The `docker-compose.yml` mounts `./data:/data` by default.
+
+- **Persisting data:** Keep the volume mount in docker-compose.yml
+- **Ephemeral storage:** Remove the volume mount
+- **Upgrading:** `docker compose pull && docker compose up -d` — DB persists across upgrades
 
 ## Troubleshooting
 
@@ -147,19 +208,19 @@ Access at `http://host:8080/admin`:
 ### Bot Not Responding
 
 - Check ncbot logs: `docker compose logs ncbot`
-- Verify channel filtering isn't blocking your channel
-- Check `allow-dms` setting for DMs
-- Look for filter log messages: "Skipping channel" or "Skipping DM"
+- Verify channel configuration — the channel must be listed in `ncbot.channels` with `ai: true`
+- For DMs, check that the sender key is in `ncbot.allowed-dms`
+- Look for filter log messages: "skipping channel" or "skipping DM"
 
 ### Responses Too Long
 
 - Reduce `NCBOT_MAX_REPLY_BYTES` (default 128)
 - The system prompt instructs the AI to keep responses under the limit
-- The bot enforces the limit by truncating/splitting at sentence boundaries
+- Condensing is enabled by default — a second AI call will compress oversized responses
 
 ### Slow Responses
 
-- Reduce `NCBOT_RESPONSE_DELAY_SECONDS` (default 1.5)
+- Reduce `NCBOT_MINIMUM_RESPONSE_MS` (default 3000)
 - Check AI model inference speed
 - Consider a faster model or hardware acceleration
 
@@ -170,11 +231,11 @@ ncbot is AI-driven rather than command-driven, but recognizes these intents:
 | Command | Response |
 |---------|----------|
 | `test` / `t` | Connection info from message details |
-| `ping` | "pong" |
-| `path` / `decode` / `route` | Hex-encoded routing path |
-| `help` | List of available capabilities |
-| `hello` / `hi` / `hey` | Friendly greeting |
-| `weather [location]` / `gwx` | Current weather (via Open-Meteo) |
+| `ping` / `p` | "pong" |
+| `path` / `m` | Hex-encoded routing path |
+| `help` / `h` | List of available capabilities |
+| `users` / `u` | List of known users |
+| `channels` / `c` | List of known channels |
 
 ## Upgrading
 
