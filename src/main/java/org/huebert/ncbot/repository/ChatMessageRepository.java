@@ -28,4 +28,28 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             """)
     List<Pair<Long, Long>> findLastSeen(Set<Long> chatChannelIds);
 
+    @Query("""
+            SELECT m
+            FROM ChatMessage m
+            WHERE m.chatChannelId = :chatChannelId
+            ORDER BY m.createdAt DESC
+            """)
+    List<ChatMessage> findMessagesByChannelOrderByCreatedDesc(Long chatChannelId, int limit);
+
+    @Query("""
+            SELECT m
+            FROM ChatMessage m
+            WHERE m.chatChannelId = :chatChannelId AND m.createdAt < :before
+            ORDER BY m.createdAt DESC
+            """)
+    List<ChatMessage> findMessagesByChannelBefore(Long chatChannelId, Instant before, int limit);
+
+    @Query("""
+            SELECT DISTINCT m.senderName
+            FROM ChatMessage m
+            WHERE m.chatChannelId = :chatChannelId
+            ORDER BY m.senderName ASC
+            """)
+    List<String> findSenderNamesByChannel(Long chatChannelId);
+
 }

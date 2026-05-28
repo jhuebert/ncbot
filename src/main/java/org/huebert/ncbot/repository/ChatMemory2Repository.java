@@ -16,4 +16,12 @@ public interface ChatMemory2Repository extends JpaRepository<ChatMemory, Long> {
             """)
     List<ChatMemory> findMemory(Long chatChannelId);
 
+    @Query("""
+            SELECT m
+            FROM ChatMemory m
+            WHERE m.chatChannelId IS NULL
+            ORDER BY m.key ASC
+            """)
+    List<ChatMemory> findGlobalMemory();
+
 }

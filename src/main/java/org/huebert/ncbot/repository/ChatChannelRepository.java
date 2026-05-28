@@ -24,4 +24,12 @@ public interface ChatChannelRepository extends JpaRepository<ChatChannel, Long> 
             """)
     List<ChatChannel> findPublicChannels();
 
+    @Query("""
+            SELECT c
+            FROM ChatChannel c
+            WHERE c.isDm = true
+            ORDER BY c.channelName ASC
+            """)
+    List<ChatChannel> findDmChannels();
+
 }
