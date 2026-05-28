@@ -102,7 +102,7 @@ body {
     max-height: calc(100vh - 160px);
     overflow-y: auto;
     display: flex;
-    flex-direction: column;
+    flex-direction: column-reverse;
     gap: 0.25rem;
 }
 
@@ -111,11 +111,11 @@ body {
 }
 
 .message-row.user {
-    align-self: flex-end;
+    align-self: flex-start;
 }
 
 .message-row.bot {
-    align-self: flex-start;
+    align-self: flex-end;
 }
 
 .message-bubble {

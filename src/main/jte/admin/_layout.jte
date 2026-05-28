@@ -149,21 +149,33 @@
             if (!container) return;
             if (container.scrollTop < 100) {
                 isLoading = true;
-                const beforeEl = container.querySelector('.message:first-child .timestamp');
+                const beforeEl = container.querySelector('.message-row:last-child .timestamp');
                 if (beforeEl) {
                     const before = beforeEl.getAttribute('data-timestamp');
                     const channelId = container.getAttribute('data-channel-id');
                     fetch('/admin/messages/' + channelId + '/older?before=' + encodeURIComponent(before))
                         .then(r => { if (!r.ok) { hasMore = false; return null; } return r.text(); })
                         .then(html => {
-                            if (html) container.insertAdjacentHTML('afterbegin', html);
+                            if (html) container.insertAdjacentHTML('beforeend', html);
                             else hasMore = false;
                         })
                         .finally(() => { isLoading = false; });
                 }
             }
         }
-        document.addEventListener('scroll', checkScroll, { passive: true });
+
+        function attachScrollListener() {
+            // Remove old listener to avoid duplicates
+            document.removeEventListener('scroll', checkScroll);
+            const container = document.querySelector('.message-container');
+            if (container) {
+                container.addEventListener('scroll', checkScroll, { passive: true });
+            }
+        }
+
+        // Attach on load and after HTMX swaps
+        attachScrollListener();
+        document.body.addEventListener('htmx:afterSwap', attachScrollListener);
     </script>
 </body>
 </html>

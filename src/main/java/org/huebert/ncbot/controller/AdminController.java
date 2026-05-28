@@ -1,8 +1,6 @@
 package org.huebert.ncbot.controller;
 
 import gg.jte.TemplateEngine;
-import gg.jte.TemplateOutput;
-import gg.jte.output.StringOutput;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatMemory;
 import org.huebert.ncbot.entity.ChatMessage;
@@ -21,6 +19,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Controller
 @RequestMapping("/admin")
@@ -54,33 +53,26 @@ public class AdminController {
         List<ChatChannel> dmChannels = channelRepository.findDmChannels();
 
         // Load the Public channel's messages by default
-        ChatChannel publicChannel = publicChannels.stream()
-                .filter(c -> "Public".equals(c.getChannelName()))
-                .findFirst()
-                .orElse(null);
+        Optional<ChatChannel> publicChannel = channelRepository.findPublicChannel();
 
         List<ChatMessage> messages = List.of();
         Long channelId = null;
         String channelName = "No channels";
 
-        if (publicChannel != null) {
+        if (publicChannel.isPresent()) {
             messages = messageRepository.findMessagesByChannelOrderByCreatedDesc(
-                    publicChannel.getId(), PAGE_SIZE);
-            channelId = publicChannel.getId();
-            channelName = publicChannel.getChannelName();
+                    publicChannel.get().getId(), PAGE_SIZE);
+            channelId = publicChannel.get().getId();
+            channelName = publicChannel.get().getChannelName();
         }
 
         // Pre-render messages HTML for initial page load
         String fmt = formatRelative(Instant.now());
-        Map<String, Object> msgParams = new HashMap<>();
-        msgParams.put("messages", messages);
-        msgParams.put("channelId", channelId);
-        msgParams.put("formatRelative", fmt);
-        String messagesHtml = renderTemplate("admin/_messages_list", msgParams);
 
         model.addAttribute("publicChannels", publicChannels);
         model.addAttribute("dmChannels", dmChannels);
-        model.addAttribute("messagesHtml", messagesHtml);
+        model.addAttribute("messages", messages);
+        model.addAttribute("formatRelative", fmt);
         model.addAttribute("channelId", channelId);
         model.addAttribute("channelName", channelName);
 
@@ -91,20 +83,19 @@ public class AdminController {
 
     @GetMapping("/messages/{id}")
     @ResponseBody
-    public String messagesHtml(@PathVariable Long id) {
+    public String messagesHtml(@PathVariable Long id, Model model) {
         List<ChatMessage> messages = messageRepository.findMessagesByChannelOrderByCreatedDesc(id, PAGE_SIZE);
         String fmt = formatRelative(Instant.now());
-        Map<String, Object> params = new HashMap<>();
-        params.put("messages", messages);
-        params.put("channelId", id);
-        params.put("formatRelative", fmt);
-        return renderTemplate("admin/_messages_list", params);
+        model.addAttribute("messages", messages);
+        model.addAttribute("channelId", id);
+        model.addAttribute("formatRelative", fmt);
+        return "admin/_messages_list";
     }
 
     @GetMapping("/messages/{id}/older")
     @ResponseBody
     public String olderMessages(@PathVariable Long id,
-                                @RequestParam(required = false) String before) {
+                                @RequestParam(required = false) String before, Model model) {
         if (before == null) {
             return "";
         }
@@ -122,60 +113,60 @@ public class AdminController {
         }
 
         String fmt = formatRelative(beforeInstant);
-        Map<String, Object> params = new HashMap<>();
-        params.put("messages", messages);
-        params.put("formatRelative", fmt);
-        return renderTemplate("admin/_messages_list_older", params);
+        model.addAttribute("messages", messages);
+        model.addAttribute("formatRelative", fmt);
+        return "admin/_messages_list_older";
     }
 
     // ── Memory ──
 
     @GetMapping("/memory/{id}")
     @ResponseBody
-    public String memoryHtml(@PathVariable Long id) {
+    public String memoryHtml(@PathVariable Long id, Model model) {
         List<ChatMemory> memories = memoryRepository.findMemory(id);
-        Map<String, Object> params = new HashMap<>();
-        params.put("memories", memories);
-        params.put("title", "Channel Memory");
-        params.put("channelId", id);
-        params.put("listId", "memory-list-" + id);
-        return renderTemplate("admin/_memory_list", params);
+        model.addAttribute("memories", memories);
+        model.addAttribute("title", "Channel Memory");
+        model.addAttribute("channelId", id);
+        model.addAttribute("listId", "memory-list-" + id);
+        return "admin/_memory_list";
     }
 
     @GetMapping("/memory/global")
     @ResponseBody
-    public String globalMemoryHtml() {
+    public String globalMemoryHtml(Model model) {
         List<ChatMemory> memories = memoryRepository.findGlobalMemory();
-        Map<String, Object> params = new HashMap<>();
-        params.put("memories", memories);
-        params.put("title", "Global Memory");
-        params.put("channelId", null);
-        params.put("listId", "global-memory-list");
-        return renderTemplate("admin/_memory_list", params);
+        model.addAttribute("memories", memories);
+        model.addAttribute("title", "Global Memory");
+        model.addAttribute("channelId", null);
+        model.addAttribute("listId", "global-memory-list");
+        return "admin/_memory_list";
     }
 
     @PostMapping("/memory")
     @ResponseBody
     public String addMemory(@RequestParam Long channelId,
                             @RequestParam String key,
-                            @RequestParam String value) {
+                            @RequestParam String value,
+                            Model model) {
         ChatMemory memory = ChatMemory.builder()
                 .chatChannelId(channelId)
                 .key(key)
                 .value(value)
                 .build();
         memoryRepository.save(memory);
-        Map<String, Object> params = new HashMap<>();
-        params.put("memory", memory);
-        params.put("channelId", channelId);
-        return renderTemplate("admin/_memory_item", params);
+        model.addAttribute("memory", memory);
+        model.addAttribute("channelId", channelId);
+        return "admin/_memory_item";
     }
 
     @PutMapping("/memory/{id}")
     @ResponseBody
-    public String updateMemory(@PathVariable Long id,
-                               @RequestParam String key,
-                               @RequestParam String value) {
+    public String updateMemory(
+            @PathVariable Long id,
+            @RequestParam String key,
+            @RequestParam String value,
+            Model model
+    ) {
         ChatMemory memory = memoryRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Memory not found: " + id));
         memory.setKey(key);
@@ -183,10 +174,9 @@ public class AdminController {
         memoryRepository.save(memory);
 
         Long channelId = memory.getChatChannelId();
-        Map<String, Object> params = new HashMap<>();
-        params.put("memory", memory);
-        params.put("channelId", channelId);
-        return renderTemplate("admin/_memory_item", params);
+        model.addAttribute("memory", memory);
+        model.addAttribute("channelId", channelId);
+        return "admin/_memory_item";
     }
 
     @DeleteMapping("/memory/{id}")
@@ -198,7 +188,7 @@ public class AdminController {
 
     @PostMapping("/memory/promote")
     @ResponseBody
-    public String promoteMemory(@RequestParam Long memoryId) {
+    public String promoteMemory(@RequestParam Long memoryId, Model model) {
         ChatMemory source = memoryRepository.findById(memoryId)
                 .orElseThrow(() -> new IllegalArgumentException("Memory not found: " + memoryId));
 
@@ -209,42 +199,31 @@ public class AdminController {
                 .build();
         memoryRepository.save(promoted);
 
-        Map<String, Object> params = new HashMap<>();
-        params.put("memory", promoted);
-        return renderTemplate("admin/_memory_item_global", params);
+        model.addAttribute("memory", promoted);
+        return "admin/_memory_item_global";
     }
 
     // ── Participants ──
 
     @GetMapping("/participants/{id}")
     @ResponseBody
-    public String participantsHtml(@PathVariable String id) {
+    public String participantsHtml(@PathVariable String id, Model model) {
         if ("null".equals(id)) {
             List<ChatParticipant> participants = participantRepository.findLastSeen();
-            Map<String, Object> params = new HashMap<>();
-            params.put("participants", participants);
-            params.put("title", "All Participants");
-            return renderTemplate("admin/_participants_list", params);
+            model.addAttribute("participants", participants);
+            model.addAttribute("title", "All Participants");
+            return "admin/_participants_list";
         } else {
             try {
                 Long channelId = Long.parseLong(id);
                 List<String> senders = messageRepository.findSenderNamesByChannel(channelId);
-                Map<String, Object> params = new HashMap<>();
-                params.put("senders", senders);
-                params.put("title", "Channel Participants");
-                return renderTemplate("admin/_channel_participants_list", params);
+                model.addAttribute("senders", senders);
+                model.addAttribute("title", "Channel Participants");
+                return "admin/_channel_participants_list";
             } catch (NumberFormatException e) {
                 return "<div class=\"empty-state\">Invalid channel ID.</div>";
             }
         }
-    }
-
-    // ── Helpers ──
-
-    private String renderTemplate(String name, Map<String, Object> params) {
-        TemplateOutput output = new StringOutput();
-        templateEngine.render(name, params, output);
-        return output.toString();
     }
 
     private String formatRelative(Instant instant) {
