@@ -1,5 +1,6 @@
 @import org.huebert.ncbot.config.NcbotProperties
 @import java.util.List
+@import java.util.Objects
 @import org.huebert.ncbot.entity.ChatChannel
 
 @param String title
@@ -35,11 +36,35 @@
             <!-- Sidebar -->
             <aside class="col-md-3 col-lg-2 d-md-block sidebar collapse" id="sidebar">
                 <div class="position-sticky pt-3">
-                    @template.admin._channel_list(
-                        publicChannels = publicChannels,
-                        dmChannels = dmChannels,
-                        activeChannelId = channelId
-                    )
+                    <div class="list-group list-group-flush">
+                        <h6 class="list-group-item-text text-muted small text-uppercase fw-bold px-3 py-2">Public</h6>
+                        @for(ChatChannel ch : publicChannels)
+                            @template.admin._channel_item(channel = ch, tab = "messages", active = Objects.equals(ch.getId(), channelId))
+                        @endfor
+
+                        <h6 class="list-group-item-text text-muted small text-uppercase fw-bold px-3 py-2">DMs</h6>
+                        @for(ChatChannel ch : dmChannels)
+                            @template.admin._channel_item(channel = ch, tab = "messages", active = Objects.equals(ch.getId(), channelId))
+                        @endfor
+
+                        <h6 class="list-group-item-text text-muted small text-uppercase fw-bold px-3 py-2">Tools</h6>
+                        <div class="list-group-item list-group-item-action channel-link"
+                             data-channel-id="global"
+                             data-tab="memory"
+                             hx-get="/admin/memory/global"
+                             hx-target="#tab-memory"
+                             hx-swap="innerHTML">
+                            <i class="bi bi-journal-text"></i> Global Memory
+                        </div>
+                        <div class="list-group-item list-group-item-action channel-link"
+                             data-channel-id="participants"
+                             data-tab="participants"
+                             hx-get="/admin/participants/null"
+                             hx-target="#tab-participants"
+                             hx-swap="innerHTML">
+                            <i class="bi bi-people"></i> Participants
+                        </div>
+                    </div>
                 </div>
             </aside>
 
