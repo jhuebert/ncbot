@@ -1,5 +1,3 @@
-@import com.google.common.base.Splitter
-@import org.apache.logging.log4j.util.Strings
 @import org.huebert.ncbot.dto.ChatRequest
 @import org.huebert.ncbot.entity.ChatMemory
 @import org.huebert.ncbot.entity.ChatMessage
@@ -23,4 +21,4 @@ ${request.senderName()}: ${request.messageText()}
 ADDITIONAL_CONTEXT:
 
 Current Time: ${ZonedDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX"))}
-Message Routing Path: ${Strings.trimToNull(request.path()) == null ? "direct route" : String.join(",", Splitter.fixedLength(request.pathBytesPerHop() * 2).splitToList(request.path()))}
+Message Routing Path: ${String.join(",", request.getPathItems())}

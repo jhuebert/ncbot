@@ -32,16 +32,17 @@ public class ChatController {
             log.debug("request: {}", request);
             ChatResponse response = chatService.processMessage(request);
             log.debug("response: {}", response);
+            if (!response.replies().isEmpty()) {
+                long delay = ncbotProperties.minimumResponseMs() - (System.currentTimeMillis() - start);
+                if (delay > 0) {
+                    log.debug("delaying {} ms", delay);
+                    Delay.sleep(delay);
+                }
+            }
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             log.error("Error processing message: {}", e.getMessage(), e);
             return ResponseEntity.ok(new ChatResponse(List.of()));
-        } finally {
-            long delay = ncbotProperties.minimumResponseMs() - (System.currentTimeMillis() - start);
-            if (delay > 0) {
-                log.debug("delaying {} ms", delay);
-                Delay.sleep(delay);
-            }
         }
     }
 
