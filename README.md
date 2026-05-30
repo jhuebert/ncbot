@@ -258,4 +258,4 @@ docker compose up -d
 
 ## License
 
-See LICENSE file.
+See LICENSE file
