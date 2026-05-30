@@ -57,9 +57,12 @@ jobs:
           git add VERSION
           git commit -m "bump version to ${{ steps.bump_version.outputs.new }} [skip ci]" || echo "No changes to commit"
 
-      - name: Push version tag
+      - name: Push version tag and commit
         run: |
           TAG="v${{ steps.bump_version.outputs.new }}"
+          # Push the commit to master first
+          git push origin master || echo "No changes to push"
+          # Then push the tag
           if git rev-parse "$TAG" >/dev/null 2>&1; then
             echo "Tag $TAG already exists, skipping"
           else
