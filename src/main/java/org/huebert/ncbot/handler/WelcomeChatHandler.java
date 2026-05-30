@@ -42,10 +42,12 @@ public class WelcomeChatHandler implements ChatHandler {
             return Optional.empty();
         }
 
+        Instant now = Instant.now();
         log.info("new participant: {}", request.senderName());
         chatParticipantRepository.save(ChatParticipant.builder()
                 .name(request.senderName())
-                .lastSeen(Instant.now())
+                .firstSeen(now)
+                .lastSeen(now)
                 .build());
 
         boolean welcome = ncbotProperties.getChannelProperties(request)

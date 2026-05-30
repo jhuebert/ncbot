@@ -25,6 +25,9 @@ public class ChatParticipant {
     @Column(name = "name", nullable = false)
     private String name;
 
+    @Column(name = "first_seen", nullable = false)
+    private Instant firstSeen;
+
     @Column(name = "last_seen", nullable = false)
     private Instant lastSeen;
 
