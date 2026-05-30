@@ -39,7 +39,8 @@
 ./gradlew test
 
 # Docker (production)
-docker compose build && docker compose up -d
+# Builds the JAR locally first, then copies it into the Docker image (fast on QEMU)
+./build.sh
 ```
 
 **Docker volumes:** `./data` → `/data` inside container (persists `ncbot.db`).
