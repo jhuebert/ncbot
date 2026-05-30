@@ -21,10 +21,11 @@ public record NcbotProperties(
         List<ChannelProperties> channels,
         Set<String> allowedDms,
         String welcomeContent,
-        boolean condense
+        boolean condense,
+        int pathUpgradeCooldownMinutes
 ) {
 
-    private static final ChannelProperties DM_PROPERTIES = new ChannelProperties(null, true, false, true);
+    private static final ChannelProperties DM_PROPERTIES = new ChannelProperties(null, true, false, true, false);
 
     public Optional<ChannelProperties> getChannelProperties(ChatRequest request) {
         if (request.isDm()) {
@@ -39,7 +40,8 @@ public record NcbotProperties(
             String name,
             boolean ai,
             boolean welcome,
-            boolean command
+            boolean command,
+            boolean pathUpgrade
     ) {
     }
 

@@ -98,6 +98,7 @@ ncbot:
     - Important decisions made
   welcome-content:
   condense: true
+  path-upgrade-cooldown-minutes: 1440
   memory-update-period: 30m
   memory-partition-size: 100
   minimum-response-ms: 3000
@@ -107,6 +108,7 @@ ncbot:
       ai: true
       welcome: true
       command: true
+      path-upgrade: true
   allowed-dms:
 
 gg:

@@ -28,4 +28,7 @@ public class ChatParticipant {
     @Column(name = "last_seen", nullable = false)
     private Instant lastSeen;
 
+    @Column(name = "path_upgrade_notified_at")
+    private Instant pathUpgradeNotifiedAt;
+
 }
