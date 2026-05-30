@@ -115,29 +115,41 @@ org.huebert.ncbot/
 
 ### Message Flow
 
-```
-POST /v1/chat (Controller)
-    └── ChatService.processMessage()
-            1. Skip if outgoing (don't reply to self)
-            2. Resolve or create ChatChannel entity
-            3. Run handler chain (ordered, first match wins):
-                 a. WelcomeChatHandler  — greets new participants
-                 b. CommandChatHandler  — handles shortcuts like !help, !ping
-                 c. AiChatHandler       — calls OpenAI-compatible model with memory + context
-            4. Save message + response to SQLite
-            5. Truncate to maxReplyBytes (128)
-            6. Apply minimumResponseMs delay
+```mermaid
+flowchart TD
+    Req["POST /v1/chat"] --> Controller["ChatController"]
+    Controller --> CS["ChatService.processMessage()"]
+
+    CS --> Check1{Is outgoing?}
+    Check1 -->|Yes| Skip1["Skip — don't reply to self"]
+    Check1 -->|No| Resolve["Resolve/create ChatChannel"]
+
+    Resolve --> HandlerChain["Run handler chain"]
+    HandlerChain --> WH["WelcomeChatHandler"]
+    WH --> CMCH["CommandChatHandler"]
+    CMCH --> AIH["AiChatHandler"]
+
+    AIH -->|Match| Resp["Build AI response"]
+    AIH -->|No match| Skip2["No handler matched"]
+
+    Resp --> Save["Save to SQLite"]
+    Save --> Truncate["Truncate ≤ 128 bytes"]
+    Truncate --> Delay["Apply minimumResponseMs delay"]
+    Delay --> RespOut["Return response"]
 ```
 
 The handler chain is ordered by `getOrder()` on the `ChatHandler` interface — **lower values run first**. `AiChatHandler` is the last resort.
 
 ### Handler Chain Ordering
 
+```mermaid
+flowchart LR
+    WH["WelcomeChatHandler"] -->|getOrder: lowest| CMCH["CommandChatHandler"]
+    CMCH -->|getOrder: medium| AIH["AiChatHandler"]
+    AIH -->|getOrder: highest| Last["Last resort — fallback to AI"]
 ```
-WelcomeChatHandler  (lowest — greet first)
-CommandChatHandler  (handle shortcuts)
-AiChatHandler       (highest — fallback to AI)
-```
+
+**Lower `getOrder()` values run first.** First matching handler short-circuits the chain.
 
 ### Key Concepts
 

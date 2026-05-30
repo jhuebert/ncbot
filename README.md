@@ -4,34 +4,32 @@ AI chat provider for [Meshcore](https://meshcore.net/), invoked by the RemoteTer
 
 ## Architecture
 
+```mermaid
+flowchart TD
+    RT["RemoteTerm (Python bot)"] -->|POST /v1/chat| CC["ChatController"]
+
+    subgraph subbot ["ncbot (Spring Boot)"]
+        CC --> CS["ChatService"]
+        CS --> HC["ChatHandler Chain (ordered)"]
+        HC --> WH["WelcomeChatHandler"]
+        HC --> PU["PathUpgradeChatHandler"]
+        HC --> CMD["CommandChatHandler"]
+        HC --> AIH["AiChatHandler"]
+        AIH --> AIS["AI Chat Service (Spring AI)"]
+        AIS -->|Tools| T1["getCurrentWeather"]
+        AIS -->|Tools| T2["getKnownChannels"]
+        AIS -->|Tools| T3["searchUsers"]
+        CS --> REPO["Repositories (JPA + SQLite)"]
+        REPO --> CM["ChatMessage"]
+        REPO --> CHAN["ChatChannel"]
+        REPO --> MEM["ChatMemory"]
+        REPO --> CP["ChatParticipant"]
+        CS --> MS["MemoryService (scheduled)"]
+        CS --> ADMIN["Admin UI (jte + MVC + JSON API)"]
+    end
 ```
-RemoteTerm (Python bot)
-       │ POST /v1/chat
-       ▼
-┌──────────────────────────────────────┐
-│           ncbot (Spring Boot)         │
-│                                       │
-│  ChatController → ChatService         │
-│       │                               │
-│  ChatHandler chain (ordered):         │
-│    • WelcomeChatHandler (new users)   │
-│    • PathUpgradeChatHandler           │
-│    • CommandChatHandler (commands)    │
-│    • AiChatHandler (AI responses)     │
-│       │                               │
-│  Repositories (JPA + SQLite):         │
-│    • ChatMessage  • ChatChannel       │
-│    • ChatMemory   • ChatParticipant   │
-│       │                               │
-│  AI Chat Service (Spring AI)          │
-│       │                               │
-│  Tools: Weather, ChatInfo             │
-│       │                               │
-│  MemoryService (scheduled condense)   │
-│       │                               │
-│  Admin UI (jte + MVC + JSON API)      │
-└──────────────────────────────────────┘
-```
+
+**Handler chain** — lower `getOrder()` runs first; `AiChatHandler` is the last resort.
 
 ## Prerequisites
 
