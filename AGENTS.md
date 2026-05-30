@@ -142,10 +142,17 @@ AiChatHandler       (highest — fallback to AI)
 ### Key Concepts
 
 #### Channel Configuration
-Channels are defined in config under `ncbot.channels`. Each has flags:
-- `ai` — enable AI responses
+Channels are defined in config under `ncbot.channels`. Each has an `ai` mode and flags:
+
+**AI Mode** (`ai`)
+- `DISABLED` — no AI responses (default when omitted)
+- `EACH` — respond to every message
+- `TAGGED` — respond only when `@ncbot` is mentioned
+
+**Other flags:**
 - `welcome` — greet new participants
 - `command` — enable command shortcuts
+- `path-upgrade` — notify users to upgrade path hash
 
 DMs are controlled separately via `ncbot.allowed-dms` (set of hex keys).
 
@@ -194,6 +201,26 @@ All config can be overridden via environment variables with the `NCBOT_` prefix:
 ### Config File
 
 Primary config: `src/main/resources/application.yaml`. Contains system prompts, channel definitions, and all other settings.
+
+**Example channel config:**
+
+```yaml
+ncbot:
+  channels:
+    - name: "#ncbot"
+      ai: EACH              # respond to every message
+      welcome: true
+      path-upgrade: true
+      command: true
+    - name: "#quiet"
+      ai: TAGGED            # only respond when @ncbot is mentioned
+      command: true
+    - name: "#noai"
+      ai: DISABLED          # no AI (or omit ai property entirely)
+      welcome: true
+```
+
+**DMs** are controlled separately via `ncbot.allowed-dms` (set of hex keys). DMs always have `ai: EACH`, `welcome: true`, and `command: true`.
 
 ---
 
@@ -272,7 +299,7 @@ Primary config: `src/main/resources/application.yaml`. Contains system prompts, 
 
 | Symptom | Likely Cause | Fix |
 |---|---|---|
-| No responses | Channel config missing `ai: true` or name mismatch | Check `ncbot.channels` in config |
+| No responses | Channel config missing `ai: EACH`/`TAGGED` or name mismatch | Check `ncbot.channels` in config |
 | DMs not working | Sender key not in allowed list | Add to `ncbot.allowed-dms` |
 | Responses too long | Condensing disabled or limit too high | Enable condensing or reduce `NCBOT_MAX_REPLY_BYTES` |
 | Slow responses | High `NCBOT_MINIMUM_RESPONSE_MS` or slow model | Reduce delay or use faster model |

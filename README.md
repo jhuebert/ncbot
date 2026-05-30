@@ -86,20 +86,33 @@ All configuration is via environment variables or `application.yaml`:
 
 ### Channel Configuration
 
-Channels are configured in `application.yaml` with per-channel flags:
+Channels are configured in `application.yaml` with an `ai` mode and per-channel flags:
 
 ```yaml
 ncbot:
   channels:
     - name: "#ncbot"
-      ai: true        # Enable AI-generated responses
-      welcome: true   # Send welcome message to new participants
-      command: true   # Enable command handler (help, ping, etc.)
+      ai: EACH              # AI responds to every message
+      welcome: true         # Send welcome message to new participants
+      command: true         # Enable command handler (help, ping, etc.)
+      path-upgrade: true    # Notify users to upgrade path hash
+    - name: "#quiet"
+      ai: TAGGED            # AI only responds when @ncbot is mentioned
+      command: true
+    - name: "#noai"
+      ai: DISABLED          # No AI responses
+      welcome: true
 ```
 
-- **`ai`** — Whether the channel gets AI-generated responses
+**AI modes:**
+- **`EACH`** — AI responds to every message
+- **`TAGGED`** — AI responds only when `@ncbot` is mentioned in the message
+- **`DISABLED`** — no AI responses (default when omitted)
+
+**Other flags:**
 - **`welcome`** — Whether new participants receive a welcome message
 - **`command`** — Whether command shortcuts are active in this channel
+- **`path-upgrade`** — Whether to notify users to upgrade their path hash
 
 ### DM Access Control
 
@@ -112,7 +125,7 @@ ncbot:
     - "hex-key-2"
 ```
 
-Leave empty or unset to block all DMs. DMs always have `ai: true`, `welcome: true`, and `command: true` enabled.
+Leave empty or unset to block all DMs. DMs always have `ai: EACH`, `welcome: true`, and `command: true`.
 
 ## RemoteTerm Setup
 
@@ -209,7 +222,7 @@ SQLite database file lives at `/data/ncbot.db` inside the container. The `docker
 ### Bot Not Responding
 
 - Check ncbot logs: `docker compose logs ncbot`
-- Verify channel configuration — the channel must be listed in `ncbot.channels` with `ai: true`
+- Verify channel configuration — the channel must be listed in `ncbot.channels` with `ai: EACH` or `ai: TAGGED`
 - For DMs, check that the sender key is in `ncbot.allowed-dms`
 - Look for filter log messages: "skipping channel" or "skipping DM"
 
