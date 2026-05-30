@@ -16,7 +16,7 @@ spring:
   ai:
     openai:
       api-key: default-key
-      base-url: http://192.168.1.240:11435/v1
+      base-url: http://localhost:11435/v1
       chat:
         options:
           model: ncbot
