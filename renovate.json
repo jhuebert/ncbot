@@ -61,6 +61,5 @@
   "prConcurrentLimit": 20,
   "suppressNotifications": ["prEditedNotification", "prIgnoreNotification"],
   "timezone": "America/Chicago",
-  "schedule": ["before 5am on monday"],
-  "dashboard": true
+  "schedule": ["before 5am on monday"]
 }
