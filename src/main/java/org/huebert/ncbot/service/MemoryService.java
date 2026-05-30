@@ -3,6 +3,7 @@ package org.huebert.ncbot.service;
 import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
+import org.huebert.ncbot.config.AiMode;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatMemory;
@@ -62,10 +63,9 @@ public class MemoryService {
                     log.debug("no properties for channel {}", channel.getChannelName());
                     continue;
                 }
-                boolean aiEnabled = channelProperties.ai();
-                boolean tagEnabled = channelProperties.respondOnTag();
-                if (!aiEnabled && !tagEnabled) {
-                    log.debug("ai and tag not enabled for channel {}, skipping", channel.getChannelName());
+                AiMode aiMode = channelProperties.ai();
+                if (aiMode == AiMode.DISABLED) {
+                    log.debug("ai disabled for channel {}, skipping", channel.getChannelName());
                     continue;
                 }
             }

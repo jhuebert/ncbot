@@ -116,8 +116,7 @@ ncbot:
       welcome: true
       path-upgrade: true
       command: true
-      respond-on-tag: false
-      ai: true
+      ai: EACH
   allowed-dms:
 
 gg:

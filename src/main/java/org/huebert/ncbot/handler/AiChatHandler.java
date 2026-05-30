@@ -3,6 +3,7 @@ package org.huebert.ncbot.handler;
 import com.google.common.base.Utf8;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
+import org.huebert.ncbot.config.AiMode;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
@@ -55,21 +56,20 @@ public class AiChatHandler implements ChatHandler {
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
         log.debug("handle: request from {} in {}", request.senderName(), request.channelName());
 
-        boolean ai = properties.getChannelProperties(request)
+        AiMode aiMode = properties.getChannelProperties(request)
                 .map(NcbotProperties.ChannelProperties::ai)
-                .orElse(false);
+                .orElse(AiMode.DISABLED);
 
-        if (!ai) {
-            boolean respondOnTag = properties.getChannelProperties(request)
-                    .map(NcbotProperties.ChannelProperties::respondOnTag)
-                    .orElse(false);
-
+        if (aiMode == AiMode.TAGGED) {
             boolean isTagged = request.messageText() != null && request.messageText().contains("@[" + properties.name() + "]");
-            if (!respondOnTag || !isTagged) {
-                log.debug("handle: ai disabled and no tag in {}, skipping", request.channelName());
+            if (!isTagged) {
+                log.debug("handle: ai mode is TAGGED, no tag in {}, skipping", request.channelName());
                 return Optional.empty();
             }
             log.debug("handle: responding to tag in {}", request.channelName());
+        } else if (aiMode == AiMode.DISABLED) {
+            log.debug("handle: ai disabled in {}, skipping", request.channelName());
+            return Optional.empty();
         }
 
         List<ChatMessage> messages = chatMessageRepository.findChannelMessages(chatChannel.getId(), chatChannel.getMemoryUpdatedAt(), Instant.now());

@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 
+import static org.huebert.ncbot.config.AiMode.*;
+
 @Slf4j
 @ConfigurationProperties(prefix = "ncbot")
 public record NcbotProperties(
@@ -26,7 +28,7 @@ public record NcbotProperties(
         String name
 ) {
 
-    private static final ChannelProperties DM_PROPERTIES = new ChannelProperties(null, true, false, true, false, false);
+    private static final ChannelProperties DM_PROPERTIES = new ChannelProperties(null, false, false, true, EACH);
 
     public Optional<ChannelProperties> getChannelProperties(ChatRequest request) {
         if (request.isDm()) {
@@ -44,12 +46,11 @@ public record NcbotProperties(
 
     public record ChannelProperties(
             String name,
-            boolean ai,
             boolean welcome,
-            boolean command,
             boolean pathUpgrade,
-            boolean respondOnTag
-    ) {
+            boolean command,
+            AiMode ai
+            ) {
     }
 
 }
