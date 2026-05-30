@@ -7,7 +7,7 @@ services:
       - "8080:8080"
     volumes:
       - ./data:/data
-      - ./application.yaml:/app/application.yaml:ro   # Config file (see application.example.yaml)
+      - ./application.yml:/app/application.yml:ro   # Config file (see application.example.yaml)
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/actuator/health"]
       interval: 30s
