@@ -113,11 +113,11 @@ ncbot:
   max-reply-bytes: 128
   channels:
     - name: "#ncbot"
-      ai: true
       welcome: true
-      command: true
       path-upgrade: true
+      command: true
       respond-on-tag: false
+      ai: true
   allowed-dms:
 
 gg:
