@@ -31,17 +31,20 @@ public class ChatController {
         try {
             log.debug("request: {}", request);
             ChatResponse response = chatService.processMessage(request);
-            log.debug("response: {}", response);
             if (!response.replies().isEmpty()) {
+                String reply = response.replies().getFirst();
+                log.debug("response: {} ({} bytes)", reply, reply.length());
                 long delay = ncbotProperties.minimumResponseMs() - (System.currentTimeMillis() - start);
                 if (delay > 0) {
                     log.debug("delaying {} ms", delay);
                     Delay.sleep(delay);
                 }
+            } else {
+                log.debug("no response generated");
             }
             return ResponseEntity.ok(response);
         } catch (Exception e) {
-            log.error("Error processing message: {}", e.getMessage(), e);
+            log.error("Error processing message from {} in {}: {}", request.senderName(), request.channelName(), e.getMessage(), e);
             return ResponseEntity.ok(new ChatResponse(List.of()));
         }
     }

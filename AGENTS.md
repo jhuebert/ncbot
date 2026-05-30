@@ -55,7 +55,8 @@ org.huebert.ncbot/
 ├── config/                        # Configuration properties
 ├── controller/                    # HTTP endpoints
 │   ├── ChatController             # POST /v1/chat — public API
-│   └── AdminController            # Admin UI routes (/admin/*)
+│   ├── AdminController            # Admin UI routes (/admin/*)
+│   └── AdminApiController         # JSON API endpoints (/api/admin/*)
 │
 ├── service/                       # Business logic
 │   ├── ChatService                # Core message processing, orchestrates handler chain
@@ -67,6 +68,7 @@ org.huebert.ncbot/
 │   ├── ChatHandler                # Interface — handlers implement this
 │   ├── AiChatHandler              # Calls OpenAI-compatible model
 │   ├── CommandChatHandler         # Shortcut commands (help, ping, etc.)
+│   ├── PathUpgradeChatHandler     # Notifies users to upgrade path hash
 │   ├── WelcomeChatHandler         # Greets new participants
 │   └── command/                   # Individual command handlers
 │       ├── ChannelsChatHandler
@@ -87,8 +89,22 @@ org.huebert.ncbot/
 │   └── ChatParticipant.java
 │
 ├── repository/                    # JPA repositories
+│   ├── ChatChannelRepository
+│   ├── ChatMemory2Repository
+│   ├── ChatMessageRepository
+│   └── ChatParticipantRepository
 ├── dto/                           # Request/response DTOs
+│   ├── ChatRequest
+│   ├── ChatResponse
+│   ├── WeatherApiResponse
+│   ├── WeatherCode
+│   ├── WeatherCurrent
+│   ├── WeatherCurrentUnits
+│   └── WeatherToolResponse
 └── util/                          # Utility classes
+    ├── Delay
+    ├── Pair
+    └── Truncate
 ```
 
 **Resources:** `src/main/resources/` (config, static assets) · `src/main/jte/` (jte templates)

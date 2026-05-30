@@ -46,8 +46,9 @@ public class MemoryService {
 
     @Scheduled(fixedDelayString = "${ncbot.memory-update-period}")
     public void updateMemory() {
-        log.debug("updateMemory");
+        log.debug("updateMemory: starting");
         Instant now = Instant.now();
+        long start = System.currentTimeMillis();
 
         for (ChatChannel channel : chatChannelRepository.findAll()) {
             log.debug("channel: {}", channel);
@@ -80,6 +81,9 @@ public class MemoryService {
             channel.setMemoryUpdatedAt(now);
             chatChannelRepository.save(channel);
         }
+
+        long elapsed = System.currentTimeMillis() - start;
+        log.info("updateMemory completed in {} ms", elapsed);
     }
 
     private void updateMemory(ChatChannel channel, List<ChatMessage> messages) {

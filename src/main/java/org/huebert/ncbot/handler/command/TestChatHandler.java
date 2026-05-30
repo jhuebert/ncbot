@@ -26,6 +26,7 @@ public class TestChatHandler implements CommandChatHandler {
 
     @Override
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
+        log.debug("handle: command={}", matches(request, COMMANDS));
 
         boolean command = ncbotProperties.getChannelProperties(request)
                 .map(NcbotProperties.ChannelProperties::command)
@@ -34,8 +35,10 @@ public class TestChatHandler implements CommandChatHandler {
             return Optional.empty();
         }
 
-        return Optional.of(templateService.render("command/test", Map.of(
+        String response = templateService.render("command/test", Map.of(
                 "request", request
-        )));
+        ));
+        log.info("{} command from {} in {}", request.messageText(), request.senderName(), request.channelName());
+        return Optional.of(response);
     }
 }

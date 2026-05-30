@@ -33,37 +33,43 @@ public class PathUpgradeChatHandler implements ChatHandler {
 
     @Override
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
+        log.debug("handle: request from {} in {}", request.senderName(), request.channelName());
 
         boolean pathUpgrade = properties.getChannelProperties(request)
                 .map(NcbotProperties.ChannelProperties::pathUpgrade)
                 .orElse(false);
         if (!pathUpgrade) {
+            log.debug("handle: pathUpgrade disabled for {}, skipping", request.channelName());
             return Optional.empty();
         }
 
         boolean usingOneByte = isUsingOneBytePath(request);
         if (!usingOneByte) {
+            log.debug("handle: {} not using 1-byte path, skipping", request.senderName());
             return Optional.empty();
         }
 
         ChatParticipant participant = chatParticipantRepository.findParticipant(request.senderName()).orElse(null);
         if (participant == null) {
+            log.debug("handle: no participant record for {}, skipping", request.senderName());
             return Optional.empty();
         }
 
         int cooldownMinutes = properties.pathUpgradeCooldownMinutes();
         Instant notifiedAt = participant.getPathUpgradeNotifiedAt();
         if (notifiedAt != null && notifiedAt.plus(Duration.ofMinutes(cooldownMinutes)).isAfter(Instant.now())) {
+            log.debug("handle: {} in cooldown (notified at {})", request.senderName(), notifiedAt);
             return Optional.empty();
         }
 
-        log.debug("notifying {} to upgrade path hash", request.senderName());
+        log.info("path upgrade notification sent to {} in {}", request.senderName(), request.channelName());
         participant.setPathUpgradeNotifiedAt(Instant.now());
         chatParticipantRepository.save(participant);
 
-        return Optional.of(templateService.render("path-upgrade", Map.of(
+        String response = templateService.render("path-upgrade", Map.of(
                 "request", request
-        )));
+        ));
+        return Optional.of(response);
     }
 
     private boolean isUsingOneBytePath(ChatRequest request) {

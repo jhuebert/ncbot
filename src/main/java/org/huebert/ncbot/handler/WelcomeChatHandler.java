@@ -32,15 +32,17 @@ public class WelcomeChatHandler implements ChatHandler {
 
     @Override
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
+        log.debug("handle: request from {} in {}", request.senderName(), request.channelName());
 
         ChatParticipant participant = chatParticipantRepository.findParticipant(request.senderName()).orElse(null);
         if (participant != null) {
             participant.setLastSeen(Instant.now());
             chatParticipantRepository.save(participant);
+            log.debug("handle: existing participant {}, updated lastSeen", request.senderName());
             return Optional.empty();
         }
 
-        log.debug("new participant {}", request.senderName());
+        log.info("new participant: {}", request.senderName());
         chatParticipantRepository.save(ChatParticipant.builder()
                 .name(request.senderName())
                 .lastSeen(Instant.now())
@@ -51,13 +53,15 @@ public class WelcomeChatHandler implements ChatHandler {
                 .orElse(false);
 
         if (welcome) {
-            log.debug("sending welcome to {}", request.senderName());
-            return Optional.of(templateService.render("welcome", Map.of(
+            log.info("welcome sent to {} in {}", request.senderName(), request.channelName());
+            String response = templateService.render("welcome", Map.of(
                     "request", request,
                     "welcomeContent", ncbotProperties.welcomeContent()
-            )));
+            ));
+            return Optional.of(response);
         }
 
+        log.debug("handle: welcome disabled for {}, no response", request.channelName());
         return Optional.empty();
     }
 

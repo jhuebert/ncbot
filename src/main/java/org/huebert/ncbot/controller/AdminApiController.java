@@ -1,5 +1,6 @@
 package org.huebert.ncbot.controller;
 
+import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatMemory;
 import org.huebert.ncbot.entity.ChatMessage;
@@ -16,6 +17,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/admin")
 public class AdminApiController {
@@ -42,9 +44,10 @@ public class AdminApiController {
 
     @GetMapping("/channels")
     public Map<String, List<ChannelDto>> channels() {
+        log.info("admin: fetching channels");
         List<ChatChannel> publicChannels = channelRepository.findPublicChannels();
         List<ChatChannel> dmChannels = channelRepository.findDmChannels();
-
+        log.debug("admin: found {} public, {} dm channels", publicChannels.size(), dmChannels.size());
         return Map.of(
                 "publicChannels", publicChannels.stream().map(ChannelDto::from).toList(),
                 "dmChannels", dmChannels.stream().map(ChannelDto::from).toList()
@@ -55,21 +58,26 @@ public class AdminApiController {
 
     @GetMapping("/messages/{channelId}")
     public MessagesResponse messages(@PathVariable Long channelId) {
+        log.info("admin: fetching messages for channel {}", channelId);
         List<ChatMessage> messages = messageRepository.findMessagesByChannelOrderByCreatedDesc(channelId, PAGE_SIZE);
+        log.debug("admin: returning {} messages for channel {}", messages.size(), channelId);
         return new MessagesResponse(channelId, null, messages.stream().map(MessageDto::from).toList());
     }
 
     @GetMapping("/messages/{channelId}/older")
     public MessagesResponse olderMessages(@PathVariable Long channelId,
                                           @RequestParam String before) {
+        log.debug("admin: fetching older messages for channel {} before {}", channelId, before);
         Instant beforeInstant;
         try {
             beforeInstant = Instant.parse(before);
         } catch (Exception e) {
+            log.warn("admin: invalid date format for older messages: {}", before);
             return new MessagesResponse(channelId, null, List.of());
         }
 
         List<ChatMessage> messages = messageRepository.findMessagesByChannelBefore(channelId, beforeInstant, PAGE_SIZE);
+        log.debug("admin: returning {} older messages for channel {}", messages.size(), channelId);
         return new MessagesResponse(channelId, null, messages.stream().map(MessageDto::from).toList());
     }
 
@@ -77,51 +85,62 @@ public class AdminApiController {
 
     @GetMapping("/memory")
     public MemoryResponse memory(@RequestParam(required = false) Long channelId) {
+        log.info("admin: fetching memory (channel={})", channelId);
         List<ChatMemory> memories;
         if (channelId == null) {
             memories = memoryRepository.findGlobalMemory();
         } else {
             memories = memoryRepository.findMemory(channelId);
         }
+        log.debug("admin: returning {} memories", memories.size());
         return new MemoryResponse(memories.stream().map(MemoryDto::from).toList());
     }
 
     @GetMapping("/memory/global")
     public MemoryResponse globalMemory() {
+        log.info("admin: fetching global memory");
         List<ChatMemory> memories = memoryRepository.findGlobalMemory();
+        log.debug("admin: returning {} global memories", memories.size());
         return new MemoryResponse(memories.stream().map(MemoryDto::from).toList());
     }
 
     @PostMapping("/memory")
     public MemoryDto createMemory(@RequestBody MemoryCreateRequest request) {
+        log.info("admin: creating memory: channel={}, key={}", request.channelId(), request.key());
         ChatMemory memory = ChatMemory.builder()
                 .chatChannelId(request.channelId())
                 .key(request.key())
                 .value(request.value())
                 .build();
         memoryRepository.save(memory);
+        log.debug("admin: created memory id={}", memory.getId());
         return MemoryDto.from(memory);
     }
 
     @PutMapping("/memory/{id}")
     public MemoryDto updateMemory(@PathVariable Long id,
                                   @RequestBody MemoryUpdateRequest request) {
+        log.info("admin: updating memory id={}", id);
         ChatMemory memory = memoryRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Memory not found: " + id));
         memory.setKey(request.key());
         memory.setValue(request.value());
         memoryRepository.save(memory);
+        log.debug("admin: updated memory id={}", id);
         return MemoryDto.from(memory);
     }
 
     @DeleteMapping("/memory/{id}")
     public ResponseEntity<Void> deleteMemory(@PathVariable Long id) {
+        log.info("admin: deleting memory id={}", id);
         memoryRepository.deleteById(id);
+        log.debug("admin: deleted memory id={}", id);
         return ResponseEntity.noContent().build();
     }
 
     @PostMapping("/memory/promote")
     public MemoryDto promoteMemory(@RequestBody MemoryPromoteRequest request) {
+        log.info("admin: promoting memory id={}", request.memoryId());
         ChatMemory source = memoryRepository.findById(request.memoryId())
                 .orElseThrow(() -> new IllegalArgumentException("Memory not found: " + request.memoryId()));
 
@@ -131,6 +150,7 @@ public class AdminApiController {
                 .value(source.getValue())
                 .build();
         memoryRepository.save(promoted);
+        log.debug("admin: promoted memory to global id={}", promoted.getId());
         return MemoryDto.from(promoted);
     }
 
@@ -138,22 +158,29 @@ public class AdminApiController {
 
     @GetMapping("/participants")
     public ParticipantsResponse participants(@RequestParam(required = false) Long channelId) {
+        log.info("admin: fetching participants (channel={})", channelId);
+        ParticipantsResponse response;
         if (channelId == null) {
             List<ChatParticipant> all = participantRepository.findLastSeen();
-            return new ParticipantsResponse(all.stream()
+            response = new ParticipantsResponse(all.stream()
                     .map(p -> new ParticipantDto(p.getName(), p.getLastSeen()))
                     .toList());
+            log.debug("admin: returning {} participants", response.senders().size());
         } else {
             List<String> senders = messageRepository.findSenderNamesByChannel(channelId);
-            return new ParticipantsResponse(senders.stream()
+            response = new ParticipantsResponse(senders.stream()
                     .map(name -> new ParticipantDto(name, null))
                     .toList());
+            log.debug("admin: returning {} senders for channel {}", response.senders().size(), channelId);
         }
+        return response;
     }
 
     @GetMapping("/participants/all")
     public ParticipantsResponse allParticipants() {
+        log.info("admin: fetching all participants");
         List<ChatParticipant> all = participantRepository.findLastSeen();
+        log.debug("admin: returning {} participants", all.size());
         return new ParticipantsResponse(all.stream()
                 .map(p -> new ParticipantDto(p.getName(), p.getLastSeen()))
                 .toList());
@@ -163,11 +190,13 @@ public class AdminApiController {
 
     @GetMapping("/info")
     public InfoResponse info() {
+        log.info("admin: fetching system info");
         long uptimeSeconds = Duration.between(startTime, Instant.now()).getSeconds();
         long totalMessages = messageRepository.count();
         long totalChannels = channelRepository.count();
         long totalMemories = memoryRepository.count();
-
+        log.debug("admin: info - uptime={}s, messages={}, channels={}, memories={}",
+                uptimeSeconds, totalMessages, totalChannels, totalMemories);
         return new InfoResponse(uptimeSeconds, totalMessages, totalChannels, totalMemories);
     }
 
@@ -212,4 +241,5 @@ public class AdminApiController {
     public record ParticipantDto(String name, Instant lastSeen) {}
 
     public record InfoResponse(long uptimeSeconds, long totalMessages, long totalChannels, long totalMemories) {}
+
 }

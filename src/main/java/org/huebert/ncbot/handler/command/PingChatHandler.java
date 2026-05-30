@@ -26,6 +26,7 @@ public class PingChatHandler implements CommandChatHandler {
 
     @Override
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
+        log.debug("handle: command={}", matches(request, COMMANDS));
 
         boolean command = ncbotProperties.getChannelProperties(request)
                 .map(NcbotProperties.ChannelProperties::command)
@@ -34,9 +35,11 @@ public class PingChatHandler implements CommandChatHandler {
             return Optional.empty();
         }
 
-        return Optional.of(templateService.render("command/ping", Map.of(
+        String response = templateService.render("command/ping", Map.of(
                 "request", request
-        )));
+        ));
+        log.info("{} command from {} in {}", request.messageText(), request.senderName(), request.channelName());
+        return Optional.of(response);
     }
 
 }

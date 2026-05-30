@@ -29,11 +29,16 @@ public record NcbotProperties(
 
     public Optional<ChannelProperties> getChannelProperties(ChatRequest request) {
         if (request.isDm()) {
+            log.debug("getChannelProperties: DM from {}, returning default properties", request.senderKey());
             return Optional.of(DM_PROPERTIES);
         }
         return channels().stream()
                 .filter(a -> a.name().equals(request.channelName()))
-                .findFirst();
+                .findFirst()
+                .or(() -> {
+                    log.info("no channel config for '{}', available: {}", request.channelName(), channels().stream().map(ChannelProperties::name).toList());
+                    return Optional.empty();
+                });
     }
 
     public record ChannelProperties(

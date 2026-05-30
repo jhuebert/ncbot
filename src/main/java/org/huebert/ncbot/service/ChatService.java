@@ -62,12 +62,16 @@ public class ChatService {
 
     private ChatChannel getChatChannel(ChatRequest request) {
         return chatChannelRepository.findChannel(request.isDm(), request.isDm() ? request.senderKey() : request.channelKey())
-                .orElseGet(() -> chatChannelRepository.saveAndFlush(ChatChannel.builder()
-                        .channelKey(request.isDm() ? request.senderKey() : request.channelKey())
-                        .channelName(request.isDm() ? request.senderName() : request.channelName())
-                        .isDm(request.isDm())
-                        .memoryUpdatedAt(Instant.EPOCH)
-                        .build()));
+                .orElseGet(() -> {
+                    ChatChannel newChannel = ChatChannel.builder()
+                            .channelKey(request.isDm() ? request.senderKey() : request.channelKey())
+                            .channelName(request.isDm() ? request.senderName() : request.channelName())
+                            .isDm(request.isDm())
+                            .memoryUpdatedAt(Instant.EPOCH)
+                            .build();
+                    log.info("creating new channel: name={}, dm={}", newChannel.getChannelName(), newChannel.getIsDm());
+                    return chatChannelRepository.saveAndFlush(newChannel);
+                });
     }
 
     private void saveInteraction(ChatChannel chatChannel, ChatRequest request, String response) {
@@ -102,12 +106,16 @@ public class ChatService {
         }
 
         for (ChatHandler handler : handlers) {
+            String handlerName = handler.getClass().getSimpleName();
+            log.debug("invoking handler: {}", handlerName);
             Optional<String> response = handler.handle(chatChannel, request);
             if (response.isPresent()) {
+                log.info("{} produced response for {} in {}", handlerName, request.senderName(), request.channelName());
                 return response;
             }
         }
 
+        log.debug("no handler produced a response");
         return Optional.empty();
     }
 

@@ -15,6 +15,7 @@ RemoteTerm (Python bot)
 │       │                               │
 │  ChatHandler chain (ordered):         │
 │    • WelcomeChatHandler (new users)   │
+│    • PathUpgradeChatHandler           │
 │    • CommandChatHandler (commands)    │
 │    • AiChatHandler (AI responses)     │
 │       │                               │
@@ -28,7 +29,7 @@ RemoteTerm (Python bot)
 │       │                               │
 │  MemoryService (scheduled condense)   │
 │       │                               │
-│  Admin UI (jte templates + MVC)       │
+│  Admin UI (jte + MVC + JSON API)      │
 └──────────────────────────────────────┘
 ```
 
@@ -223,19 +224,6 @@ SQLite database file lives at `/data/ncbot.db` inside the container. The `docker
 - Reduce `NCBOT_MINIMUM_RESPONSE_MS` (default 3000)
 - Check AI model inference speed
 - Consider a faster model or hardware acceleration
-
-## Commands
-
-ncbot is AI-driven rather than command-driven, but recognizes these intents:
-
-| Command | Response |
-|---------|----------|
-| `test` / `t` | Connection info from message details |
-| `ping` / `p` | "pong" |
-| `path` / `m` | Hex-encoded routing path |
-| `help` / `h` | List of available capabilities |
-| `users` / `u` | List of known users |
-| `channels` / `c` | List of known channels |
 
 ## Upgrading
 

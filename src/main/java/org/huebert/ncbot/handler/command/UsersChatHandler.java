@@ -32,6 +32,7 @@ public class UsersChatHandler implements CommandChatHandler {
 
     @Override
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
+        log.debug("handle: command={}", matches(request, COMMANDS));
 
         boolean command = ncbotProperties.getChannelProperties(request)
                 .map(NcbotProperties.ChannelProperties::command)
@@ -46,10 +47,12 @@ public class UsersChatHandler implements CommandChatHandler {
 
         String text = Truncate.joinWithLimit(users, ncbotProperties.maxReplyBytes(), "\n");
 
-        return Optional.of(templateService.render("command/users", Map.of(
+        String response = templateService.render("command/users", Map.of(
                 "request", request,
                 "users", text.trim()
-        )));
+        ));
+        log.info("{} command from {} in {} ({} users)", request.messageText(), request.senderName(), request.channelName(), users.size());
+        return Optional.of(response);
     }
 
 }

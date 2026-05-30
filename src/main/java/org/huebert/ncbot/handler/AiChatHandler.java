@@ -55,7 +55,7 @@ public class AiChatHandler implements ChatHandler {
 
     @Override
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
-        log.debug("handle: {}", request);
+        log.debug("handle: request from {} in {}", request.senderName(), request.channelName());
 
         boolean ai = properties.getChannelProperties(request)
                 .map(NcbotProperties.ChannelProperties::ai)
@@ -67,14 +67,15 @@ public class AiChatHandler implements ChatHandler {
                     .orElse(false);
             boolean isTagged = request.messageText() != null && request.messageText().contains(BOT_TAG);
             if (!respondOnTag || !isTagged) {
-                log.debug("ai not enabled and no tag for {}", request.channelName());
+                log.debug("handle: ai disabled and no tag in {}, skipping", request.channelName());
                 return Optional.empty();
             }
-            log.debug("responding to tag in {}", request.channelName());
+            log.debug("handle: responding to tag in {}", request.channelName());
         }
 
         List<ChatMessage> messages = chatMessageRepository.findChannelMessages(chatChannel.getId(), chatChannel.getMemoryUpdatedAt(), Instant.now());
         List<ChatMemory> memories = chatMemoryRepository.findMemory(chatChannel.getId());
+        log.debug("handle: loaded {} messages, {} memories for channel {}", messages.size(), memories.size(), chatChannel.getChannelName());
 
         String output = templateService.render("chat", Map.of(
                 "memories", memories,
@@ -82,14 +83,18 @@ public class AiChatHandler implements ChatHandler {
                 "request", request
         ));
 
+        long start = System.currentTimeMillis();
         String response = chatClient.prompt()
                 .system(properties.systemPrompt())
                 .user(output)
                 .messages()
                 .call()
                 .content();
+        long elapsed = System.currentTimeMillis() - start;
+        log.info("AI call completed in {} ms, response {} bytes for {} in {}", elapsed, Utf8.encodedLength(response), request.senderName(), request.channelName());
 
         if ("EMPTY".equalsIgnoreCase(Strings.trimToNull(response))) {
+            log.debug("handle: AI returned empty response");
             return Optional.empty();
         }
 
