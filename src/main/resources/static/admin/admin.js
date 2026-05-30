@@ -134,10 +134,14 @@
         switchTab('messages');
 
         // Close sidebar on mobile
-        const sidebarCollapse = document.getElementById('sidebar');
-        if (sidebarCollapse.classList.contains('show')) {
-            const bsCollapse = bootstrap.Collapse.getInstance(sidebarCollapse);
-            if (bsCollapse) bsCollapse.hide();
+        if (window.innerWidth <= 768) {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.remove('show');
+            // Also hide the Bootstrap toggle
+            const toggleBtn = document.querySelector('[data-bs-target="#sidebar"]');
+            if (toggleBtn) {
+                toggleBtn.setAttribute('aria-expanded', 'false');
+            }
         }
     }
 
@@ -395,7 +399,7 @@
         memoryModal.show();
     };
 
-    async function saveMemoryFromModal() {
+    window.saveMemoryFromModal = async function() {
         const id = document.getElementById('memoryFormId').value;
         const channelId = document.getElementById('memoryFormChannelId').value;
         const key = document.getElementById('memoryFormKey').value.trim();
@@ -506,6 +510,15 @@
             console.error('Failed to load info:', e);
         }
     };
+
+    // ── Mobile sidebar toggle ──
+    document.querySelector('[data-bs-target="#sidebar"]').addEventListener('click', () => {
+        const sidebar = document.getElementById('sidebar');
+        const isShowing = sidebar.classList.contains('show');
+        sidebar.classList.toggle('show');
+        const toggleBtn = document.querySelector('[data-bs-target="#sidebar"]');
+        toggleBtn.setAttribute('aria-expanded', String(!isShowing));
+    });
 
     // ── Initialize ──
     async function init() {

@@ -10,40 +10,43 @@
 </head>
 <body>
 
-<!-- Navbar -->
-<nav class="navbar navbar-expand-lg border-bottom">
-    <div class="container-fluid">
+<!-- Top Navbar -->
+<nav class="navbar navbar-expand border-bottom">
+    <div class="container-fluid px-3">
         <a class="navbar-brand fw-bold" href="#">
             <i class="bi bi-robot"></i> ncbot
         </a>
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar" aria-controls="sidebar" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
-        <div class="collapse navbar-collapse" id="sidebar">
-            <ul class="navbar-nav me-auto">
-                <li class="nav-item">
-                    <a class="nav-link" href="#" id="nav-info" onclick="showInfo(); return false;">
-                        <i class="bi bi-info-circle"></i> Info
-                    </a>
-                </li>
-            </ul>
-            <!-- Sidebar: Channels -->
-            <div class="sidebar-container border-end">
-                <div class="sidebar-header px-3 py-2 d-flex align-items-center justify-content-between">
-                    <span class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Channels</span>
-                    <button class="btn btn-sm btn-outline-secondary" onclick="refreshChannels()" title="Refresh">
-                        <i class="bi bi-arrow-clockwise"></i>
-                    </button>
-                </div>
-                <div id="channels-public" class="sidebar-list"></div>
-                <div id="channels-dm" class="sidebar-list"></div>
-            </div>
-        </div>
+        <ul class="navbar-nav ms-auto">
+            <li class="nav-item">
+                <a class="nav-link" href="#" id="nav-info" onclick="showInfo(); return false;">
+                    <i class="bi bi-info-circle"></i> Info
+                </a>
+            </li>
+        </ul>
     </div>
 </nav>
 
-<!-- Main Content -->
-<div class="container-fluid main-content">
+<div class="app-body">
+    <!-- Left Sidebar: Channels -->
+    <aside class="sidebar" id="sidebar">
+        <div class="sidebar-header px-3 py-2 d-flex align-items-center justify-content-between">
+            <span class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Channels</span>
+            <button class="btn btn-sm btn-outline-secondary" onclick="refreshChannels()" title="Refresh">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+        <div id="channels-public" class="sidebar-list"></div>
+        <div class="sidebar-section-header px-3 py-2 d-flex align-items-center justify-content-between">
+            <span class="small text-body-secondary text-uppercase fw-semibold" style="letter-spacing: 0.05em;">Direct Messages</span>
+        </div>
+        <div id="channels-dm" class="sidebar-list"></div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
     <!-- Tab bar -->
     <ul class="nav nav-tabs nav-underline" id="mainTabs" role="tablist">
         <li class="nav-item" role="presentation">
@@ -136,6 +139,8 @@
             </div>
         </div>
     </div>
+</main>
+
 </div>
 
 <!-- Add/Edit Memory Modal -->

@@ -90,7 +90,7 @@ public class AdminApiController {
         if (channelId == null) {
             memories = memoryRepository.findGlobalMemory();
         } else {
-            memories = memoryRepository.findMemory(channelId);
+            memories = memoryRepository.findChannelMemory(channelId);
         }
         log.debug("admin: returning {} memories", memories.size());
         return new MemoryResponse(memories.stream().map(MemoryDto::from).toList());
