@@ -1,9 +1,11 @@
+# ---- Builder stage ----
 FROM eclipse-temurin:25-jdk AS build
 WORKDIR /app
 COPY . .
 RUN chmod +x ./gradlew
 RUN ./gradlew build -x test --no-daemon
 
+# ---- Runtime stage ----
 FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 RUN mkdir -p /data && addgroup -S ncbot && adduser -S ncbot -G ncbot

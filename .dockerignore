@@ -1,0 +1,47 @@
+# Build outputs
+build/
+out/
+*.class
+
+# Gradle cache
+.gradle/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Database files (persisted via volume anyway)
+*.db
+*.db-journal
+*.db-wal
+ncbot.db
+
+# Secrets
+.env
+
+# Local data
+data/
+
+# Generated
+jte-classes/
+
+# Temp
+temp/
+
+# Git
+.git/
+.gitignore
+
+# Docs (not needed in container)
+HELP.md
+README.md
+AGENTS.md
+application.example.yaml
+
+# CI/CD configs (not needed in container)
+.github/

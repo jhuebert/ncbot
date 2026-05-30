@@ -1,0 +1,23 @@
+# ── ncbot — Example Configuration ──
+# Copy to application.yaml and set your API key + channels.
+# Everything else uses sensible defaults from the built-in config.
+
+spring:
+  ai:
+    openai:
+      api-key: your-api-key-here          # Your OpenAI-compatible API key
+      base-url: http://localhost:11435/v1 # e.g. llama.cpp, Ollama, vLLM
+      chat:
+        options:
+          model: ncbot                    # Model identifier
+
+ncbot:
+  channels:
+    - name: "#ncbot"
+      welcome: true
+      path-upgrade: true
+      command: true
+      ai: EACH
+
+  allowed-dms:              # Empty list allows all DMs
+    - "abc123def456"        # Hex key of participants allowed to DM

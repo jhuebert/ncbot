@@ -16,7 +16,6 @@ public record NcbotProperties(
         String systemPrompt,
         String condensePrompt,
         String memoryPrompt,
-        int memoryUpdateMinutes,
         int memoryPartitionSize,
         long minimumResponseMs,
         int maxReplyBytes,
