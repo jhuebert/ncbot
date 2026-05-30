@@ -62,8 +62,10 @@ public class MemoryService {
                     log.debug("no properties for channel {}", channel.getChannelName());
                     continue;
                 }
-                if (!channelProperties.ai()) {
-                    log.debug("ai not enabled for channel {}", channel.getChannelName());
+                boolean aiEnabled = channelProperties.ai();
+                boolean tagEnabled = channelProperties.respondOnTag();
+                if (!aiEnabled && !tagEnabled) {
+                    log.debug("ai and tag not enabled for channel {}, skipping", channel.getChannelName());
                     continue;
                 }
             }
