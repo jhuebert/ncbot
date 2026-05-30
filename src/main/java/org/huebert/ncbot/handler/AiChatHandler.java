@@ -28,8 +28,6 @@ public class AiChatHandler implements ChatHandler {
 
     private static final int ORDER = -100;
 
-    private static final String BOT_TAG = "@[ncbot]";
-
     private final ChatClient chatClient;
     private final NcbotProperties properties;
     private final TemplateService templateService;
@@ -65,7 +63,8 @@ public class AiChatHandler implements ChatHandler {
             boolean respondOnTag = properties.getChannelProperties(request)
                     .map(NcbotProperties.ChannelProperties::respondOnTag)
                     .orElse(false);
-            boolean isTagged = request.messageText() != null && request.messageText().contains(BOT_TAG);
+
+            boolean isTagged = request.messageText() != null && request.messageText().contains("@[" + properties.name() + "]");
             if (!respondOnTag || !isTagged) {
                 log.debug("handle: ai disabled and no tag in {}, skipping", request.channelName());
                 return Optional.empty();

@@ -22,7 +22,8 @@ public record NcbotProperties(
         Set<String> allowedDms,
         String welcomeContent,
         boolean condense,
-        int pathUpgradeCooldownMinutes
+        int pathUpgradeCooldownMinutes,
+        String name
 ) {
 
     private static final ChannelProperties DM_PROPERTIES = new ChannelProperties(null, true, false, true, false, false);
