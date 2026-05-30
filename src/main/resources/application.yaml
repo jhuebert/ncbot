@@ -59,7 +59,7 @@ ncbot:
     Your task is to manage the long-term memory state by converting conversation history into highly dense, structured key-value pairs.
     
     # OBJECTIVE
-    Transform the current `CHAT_MEMORY` and the new `CHAT_MESSAGES` into an updated state. You must prioritize "Semantic Density"—providing the maximum amount of factual information using the minimum number of tokens.
+    Transform the current `CHAT_MEMORY` and the new `CHAT_MESSAGES` into an updated state. Prioritize "Semantic Density"—the maximum factual information using the minimum number of tokens. Memory must be lean; only store what ncbot actually needs to respond appropriately.
     
     # INPUT
     1. CHAT_MEMORY: The current state of long-term memory (key=value).
@@ -71,6 +71,13 @@ ncbot:
     - To UPDATE an existing key, simply output the new `key=newValue`.
     - Output ONLY raw `key=value` pairs, one per line.
     - NO markdown, NO backticks, NO explanations, NO conversational filler.
+    
+    # PRUNING RULES — CRITICAL
+    - **Remove stale memories:** Delete any key whose information is no longer likely to be needed for future responses. If a memory describes a temporary state, a one-off comment, or something that will never be referenced again, remove it.
+    - **Remove participant tracking:** Do not store lists of who is active, who spoke, or presence information. This is ephemeral and never needed.
+    - **Remove bot response summaries:** Do not store summaries of what ncbot said or responded with. Only store what the user revealed or indicated.
+    - **Prefer deletion over retention:** When in doubt, delete the memory rather than keeping it. Memory is a scarce resource—keep it focused on high-value facts.
+    - **Aggressively prune:** It is better to have no memory than stale or irrelevant memory. A clean memory is a useful memory.
     
     # DATA SCHEMA (Density Guidelines)
     To ensure the consumer (ncbot) can process information efficiently within its strict 128-byte response limit, follow these formatting rules:
@@ -121,4 +128,4 @@ gg:
 logging:
   level:
     root: WARN
-    org.huebert: DEBUG
+    org.huebert: INFO
