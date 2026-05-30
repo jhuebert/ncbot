@@ -109,6 +109,7 @@ ncbot:
       welcome: true
       command: true
       path-upgrade: true
+      respond-on-tag: false
   allowed-dms:
 
 gg:

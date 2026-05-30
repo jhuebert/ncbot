@@ -25,7 +25,7 @@ public record NcbotProperties(
         int pathUpgradeCooldownMinutes
 ) {
 
-    private static final ChannelProperties DM_PROPERTIES = new ChannelProperties(null, true, false, true, false);
+    private static final ChannelProperties DM_PROPERTIES = new ChannelProperties(null, true, false, true, false, false);
 
     public Optional<ChannelProperties> getChannelProperties(ChatRequest request) {
         if (request.isDm()) {
@@ -41,7 +41,8 @@ public record NcbotProperties(
             boolean ai,
             boolean welcome,
             boolean command,
-            boolean pathUpgrade
+            boolean pathUpgrade,
+            boolean respondOnTag
     ) {
     }
 
