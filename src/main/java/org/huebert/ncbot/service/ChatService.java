@@ -1,6 +1,7 @@
 package org.huebert.ncbot.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.huebert.ncbot.config.ChannelCapabilities;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.dto.ChatResponse;
@@ -76,31 +77,39 @@ public class ChatService {
 
     private void saveInteraction(ChatChannel chatChannel, ChatRequest request, String response) {
         log.debug("saveInteraction: request={}, response={}", request.messageText(), response);
-        chatMessageRepository.save(ChatMessage.builder()
+        ChatMessage userMessage = ChatMessage.builder()
                 .chatChannelId(chatChannel.getId())
                 .content(request.messageText())
                 .createdAt(Instant.now())
                 .senderName(request.senderName())
-                .build());
+                .build();
         if (response != null) {
-            chatMessageRepository.save(ChatMessage.builder()
+            ChatMessage botMessage = ChatMessage.builder()
                     .chatChannelId(chatChannel.getId())
                     .content(response)
                     .createdAt(Instant.now())
                     .senderName("ncbot")
-                    .build());
+                    .build();
+            chatMessageRepository.saveAll(List.of(userMessage, botMessage));
+        } else {
+            chatMessageRepository.save(userMessage);
         }
     }
 
     private Optional<String> generateResponse(ChatChannel chatChannel, ChatRequest request) {
         log.debug("generateResponse: chatChannel={}, request={}", chatChannel, request);
 
+        // DM authorization check
         if (request.isDm()) {
             if (!properties.allowedDms().isEmpty() && !properties.allowedDms().contains(request.senderKey())) {
                 log.debug("skipping DM {}", request.senderKey());
                 return Optional.empty();
             }
-        } else if (properties.getChannelProperties(request).isEmpty()) {
+        }
+
+        // Resolve channel capabilities — if empty, channel is not configured
+        Optional<ChannelCapabilities> capsOpt = properties.getChannelCapabilities(request);
+        if (capsOpt.isEmpty()) {
             log.debug("skipping channel {}", request.channelName());
             return Optional.empty();
         }
@@ -110,6 +119,10 @@ public class ChatService {
             log.debug("invoking handler: {}", handlerName);
             Optional<String> response = handler.handle(chatChannel, request);
             if (response.isPresent()) {
+                if (response.get().equals(ChatHandler.DO_NOT_RESPOND)) {
+                    log.debug("handler {} short-circuited the chain", handlerName);
+                    return Optional.empty();
+                }
                 log.info("{} produced response for {} in {}", handlerName, request.senderName(), request.channelName());
                 return response;
             }

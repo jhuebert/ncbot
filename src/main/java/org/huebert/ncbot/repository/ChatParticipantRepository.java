@@ -1,6 +1,8 @@
 package org.huebert.ncbot.repository;
 
 import org.huebert.ncbot.entity.ChatParticipant;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -30,5 +32,12 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
             ORDER BY p.lastSeen DESC
             """)
     List<ChatParticipant> findLastSeen();
+
+    @Query("""
+            SELECT p
+            FROM ChatParticipant p
+            ORDER BY p.lastSeen DESC
+            """)
+    Page<ChatParticipant> findLastSeen(Pageable pageable);
 
 }

@@ -2,6 +2,8 @@ package org.huebert.ncbot.repository;
 
 import org.huebert.ncbot.entity.ChatMessage;
 import org.huebert.ncbot.util.Pair;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -28,21 +30,37 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             """)
     List<Pair<Long, Long>> findLastSeen(Set<Long> chatChannelIds);
 
-    @Query(value = """
-            SELECT * FROM chat_message
-            WHERE chat_channel_id = :chatChannelId
-            ORDER BY created_at DESC
-            LIMIT :limit
-            """, nativeQuery = true)
-    List<ChatMessage> findMessagesByChannelOrderByCreatedDesc(Long chatChannelId, int limit);
+    @Query("""
+            SELECT m
+            FROM ChatMessage m
+            WHERE m.chatChannelId = :chatChannelId
+            ORDER BY m.createdAt DESC
+            """)
+    Page<ChatMessage> findMessagesByChannelOrderByCreatedDesc(Long chatChannelId, Pageable pageable);
 
-    @Query(value = """
-            SELECT * FROM chat_message
-            WHERE chat_channel_id = :chatChannelId AND created_at < :before
-            ORDER BY created_at DESC
-            LIMIT :limit
-            """, nativeQuery = true)
-    List<ChatMessage> findMessagesByChannelBefore(Long chatChannelId, Instant before, int limit);
+    @Query("""
+            SELECT m
+            FROM ChatMessage m
+            WHERE m.chatChannelId = :chatChannelId AND m.createdAt < :before
+            ORDER BY m.createdAt DESC
+            """)
+    Page<ChatMessage> findMessagesByChannelBefore(Long chatChannelId, Instant before, Pageable pageable);
+
+    @Query("""
+            SELECT m
+            FROM ChatMessage m
+            WHERE m.chatChannelId = :chatChannelId AND m.createdAt > :after
+            ORDER BY m.createdAt ASC
+            """)
+    Page<ChatMessage> findMessagesByChannelAfter(Long chatChannelId, Instant after, Pageable pageable);
+
+    @Query("""
+            SELECT m
+            FROM ChatMessage m
+            WHERE m.chatChannelId = :chatChannelId AND m.createdAt < :before AND m.createdAt > :after
+            ORDER BY m.createdAt DESC
+            """)
+    Page<ChatMessage> findMessagesByChannelBetween(Long chatChannelId, Instant before, Instant after, Pageable pageable);
 
     @Query("""
             SELECT DISTINCT m.senderName
@@ -51,5 +69,12 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             ORDER BY m.senderName ASC
             """)
     List<String> findSenderNamesByChannel(Long chatChannelId);
+
+    @Query("""
+            SELECT DISTINCT m.senderName
+            FROM ChatMessage m
+            WHERE m.chatChannelId = :chatChannelId
+            """)
+    Page<String> findSenderNamesByChannel(Long chatChannelId, Pageable pageable);
 
 }

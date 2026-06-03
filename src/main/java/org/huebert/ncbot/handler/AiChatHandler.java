@@ -4,6 +4,7 @@ import com.google.common.base.Utf8;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.huebert.ncbot.config.AiMode;
+import org.huebert.ncbot.config.ChannelCapabilities;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
@@ -56,8 +57,8 @@ public class AiChatHandler implements ChatHandler {
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
         log.debug("handle: request from {} in {}", request.senderName(), request.channelName());
 
-        AiMode aiMode = properties.getChannelProperties(request)
-                .map(NcbotProperties.ChannelProperties::ai)
+        AiMode aiMode = properties.getChannelCapabilities(request)
+                .map(ChannelCapabilities::ai)
                 .orElse(AiMode.DISABLED);
 
         if (aiMode == AiMode.TAGGED) {

@@ -11,10 +11,14 @@ flowchart TD
     subgraph subbot ["ncbot (Spring Boot)"]
         CC --> CS["ChatService"]
         CS --> HC["ChatHandler Chain (ordered)"]
-        HC --> WH["WelcomeChatHandler"]
-        HC --> PU["PathUpgradeChatHandler"]
-        HC --> CMD["CommandChatHandler"]
-        HC --> AIH["AiChatHandler"]
+        HC --> BH["BlockingChatHandler"]
+        BH -->|blocked| SKIP["Short-circuit"]
+        BH --> PFC["PathFilterChatHandler"]
+        PFC -->|1-byte path| SKIP
+        PFC --> WH["WelcomeChatHandler"]
+        WH --> PU["PathUpgradeChatHandler"]
+        PU --> CMD["CommandChatHandler"]
+        CMD --> AIH["AiChatHandler"]
         AIH --> AIS["AI Chat Service (Spring AI)"]
         AIS -->|Tools| T1["getCurrentWeather"]
         AIS -->|Tools| T2["getKnownChannels"]
@@ -25,7 +29,6 @@ flowchart TD
         REPO --> MEM["ChatMemory"]
         REPO --> CP["ChatParticipant"]
         CS --> MS["MemoryService (scheduled)"]
-        CS --> ADMIN["Admin UI (jte + MVC + JSON API)"]
     end
 ```
 
@@ -62,18 +65,18 @@ export NCBOT_URL=http://localhost:8080/v1/chat
 
 RemoteTerm will invoke `bot(**kwargs)` for every message. The script forwards it to ncbot and returns the AI response.
 
-### 3. Access the Admin UI
+### 3. Access the Admin API
 
-Open `http://localhost:8080/admin` in your browser.
+Browse entities via the custom admin API at `http://localhost:8080/api/channels`.
 
 ## Configuration
 
-All configuration is via environment variables or `application.yaml`:
+All configuration is via environment variables or `application.yml`:
 
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `NCBOT_API_KEY` | `default-key` | API key for the OpenAI-compatible endpoint |
-| `NCBOT_OPENAI_BASE_URL` | *(from application.yaml)* | Base URL for the AI server |
+| `NCBOT_OPENAI_BASE_URL` | *(from application.yml)* | Base URL for the AI server |
 | `NCBOT_MODEL` | `ncbot` | Model name/identifier |
 | `NCBOT_MINIMUM_RESPONSE_MS` | `3000` | Minimum response delay in milliseconds (0 to disable) |
 | `NCBOT_MAX_REPLY_BYTES` | `128` | Max UTF-8 bytes per reply message |
@@ -82,45 +85,53 @@ All configuration is via environment variables or `application.yaml`:
 | `NCBOT_MEMORY_PARTITION_SIZE` | `100` | Number of messages per memory partition |
 | `NCBOT_WELCOME_CONTENT` | *(empty)* | Welcome message appended for new participants |
 
-### Channel Configuration
+### Channel Configuration (Flat Lists)
 
-Channels are configured in `application.yaml` with an `ai` mode and per-channel flags:
+Channels are configured via comma-separated lists — one per capability. Each list contains channel names that enable that capability:
 
 ```yaml
 ncbot:
-  channels:
-    - name: "#ncbot"
-      ai: EACH              # AI responds to every message
-      welcome: true         # Send welcome message to new participants
-      command: true         # Enable command handler (help, ping, etc.)
-      path-upgrade: true    # Notify users to upgrade path hash
-    - name: "#quiet"
-      ai: TAGGED            # AI only responds when @ncbot is mentioned
-      command: true
-    - name: "#noai"
-      ai: DISABLED          # No AI responses
-      welcome: true
+  channels-welcome: "#ncbot, #general"
+  channels-command: "#ncbot, #general"
+  channels-path-upgrade: "#ncbot"
+  channels-ai-each: "#ncbot, #general"
+  channels-ai-tagged: "#quiet"
+  channels-ai-disabled: "#noai"
 ```
 
-**AI modes:**
-- **`EACH`** — AI responds to every message
-- **`TAGGED`** — AI responds only when `@ncbot` is mentioned in the message
-- **`DISABLED`** — no AI responses (default when omitted)
+**AI Mode Precedence:**
+1. `ai-disabled` wins over `ai-tagged` and `ai-each` (explicit disable)
+2. `ai-each` wins over `ai-tagged` (respond to everything beats respond-only-on-tag)
+3. Default is `DISABLED` if channel appears in no AI list
 
-**Other flags:**
-- **`welcome`** — Whether new participants receive a welcome message
-- **`command`** — Whether command shortcuts are active in this channel
-- **`path-upgrade`** — Whether to notify users to upgrade their path hash
+**Other flags** (`welcome`, `command`, `path-upgrade`) are independent boolean flags — presence in the list means `true`, absence means `false`.
+
+**Environment variable example:**
+```bash
+NCBOT_CHANNELS_AI_EACH="#ncbot, #general"
+NCBOT_CHANNELS_AI_TAGGED="#quiet"
+NCBOT_CHANNELS_AI_DISABLED="#noai"
+```
+
+### Malicious User Blocking
+
+```yaml
+ncbot:
+  block-user-patterns: ".*(bot|spam|scam).*"
+  allow-user-patterns: "admin.*"
+  block-path-patterns: ".*malicious.*"
+  allow-path-patterns: "internal.*"
+```
+
+**Precedence:** allow always beats block. If a user/path matches an allow pattern, they are allowed regardless of block patterns.
 
 ### DM Access Control
 
-DMs are controlled via a set of allowed sender keys:
+DMs are controlled via a comma-separated list of allowed sender keys:
 
 ```yaml
 ncbot:
-  allowed-dms:
-    - "hex-key-1"
-    - "hex-key-2"
+  allowed-dms: "hex-key-1, hex-key-2"
 ```
 
 Leave empty or unset to block all DMs. DMs always have `ai: EACH`, `welcome: true`, and `command: true`.
@@ -178,19 +189,45 @@ The AI model has access to these tools:
 | `getKnownChannels` | List all known Meshcore channels the bot has seen |
 | `searchUsers` | Search for users by name substring |
 
-## Admin UI
+## Admin API
 
-Access at `http://host:8080/admin`:
+Custom endpoints at `/api/*` provide read access to all entities plus full CRUD on memories. Global and channel-specific memory operations use **separate, distinct routes** (no optional channel parameters).
 
-| Route | Purpose |
-|-------|---------|
-| `/admin` | Dashboard — message stats, uptime, channel stats |
-| `/admin/messages` | Message log viewer (paginated) |
-| `/admin/config` | View current configuration |
+All read endpoints support pagination via `?page=1&size=25` (1-indexed page, default 25 per page). Responses use the generic `PageResponse<T>` wrapper:
+
+```json
+{
+  "content": [...],
+  "totalPages": 5,
+  "currentPage": 2,
+  "totalElements": 123
+}
+```
+
+| Path | Method | Description |
+|------|--------|-------------|
+| `/api/channels` | GET | All channels (filter: `?dm=true\|false`) — `PageResponse<ChannelDto>` |
+| `/api/channels/{channelId}/messages` | GET | Messages (`?page`, `?size`, `?before=ISO-instant`, `?after=ISO-instant`, `?sortDirection=ASC\|DESC`) — `MessagesResponse` |
+| `/api/channels/{channelId}/memory` | GET | Channel-specific memories — `PageResponse<MemoryDto>` |
+| `/api/channels/{channelId}/memory` | POST | Create channel memory (body: `{key, value}`) — `MemoryDto` |
+| `/api/channels/{channelId}/memory/{id}` | PUT | Update channel memory (body: `{key, value}`) — validates channel match — `MemoryDto` |
+| `/api/channels/{channelId}/memory/{id}` | DELETE | Delete channel memory — validates channel match — `204 No Content` |
+| `/api/channels/{channelId}/memory/{id}/promote` | POST | Promote channel memory to global (deletes source) — `MemoryDto` |
+| `/api/channels/{channelId}/participants` | GET | Participants for a channel — `PageResponse<ParticipantDto>` |
+| `/api/memory` | GET | Global memories — `PageResponse<MemoryDto>` |
+| `/api/memory` | POST | Create global memory (body: `{key, value}`) — `MemoryDto` |
+| `/api/memory/{id}` | PUT | Update global memory (body: `{key, value}`) — validates global scope — `MemoryDto` |
+| `/api/memory/{id}` | DELETE | Delete global memory — validates global scope — `204 No Content` |
+| `/api/participants` | GET | All participants with last seen — `PageResponse<ParticipantDto>` |
+
+**Validation rules:**
+- Channel memory endpoints (`/api/channels/{channelId}/memory/*`) reject requests where the memory's `chatChannelId` doesn't match the path parameter
+- Global memory endpoints (`/api/memory/*`) reject requests where the memory has a non-null `chatChannelId`
+- Promote endpoint validates source belongs to the specified channel, then copies to global and deletes the source
 
 ## Commands
 
-Commands are per-channel (controlled by the `command` flag). They are matched case-insensitively and use single-letter aliases:
+Commands are per-channel (controlled by the `channels-command` list). They are matched case-insensitively and use single-letter aliases:
 
 | Command | Alias | Response |
 |---------|-------|----------|
@@ -220,7 +257,7 @@ SQLite database file lives at `/data/ncbot.db` inside the container. The `docker
 ### Bot Not Responding
 
 - Check ncbot logs: `docker compose logs ncbot`
-- Verify channel configuration — the channel must be listed in `ncbot.channels` with `ai: EACH` or `ai: TAGGED`
+- Verify channel configuration — the channel must appear in `channels-ai-each` or `channels-ai-tagged`
 - For DMs, check that the sender key is in `ncbot.allowed-dms`
 - Look for filter log messages: "skipping channel" or "skipping DM"
 
@@ -235,6 +272,17 @@ SQLite database file lives at `/data/ncbot.db` inside the container. The `docker
 - Reduce `NCBOT_MINIMUM_RESPONSE_MS` (default 3000)
 - Check AI model inference speed
 - Consider a faster model or hardware acceleration
+
+### User Blocked Unexpectedly
+
+- Check `block-user-patterns` — the user name may match a regex
+- Use `allow-user-patterns` to whitelist specific users
+- Check logs for "blocked" messages
+
+### 1-Byte Path Messages Not Responding
+
+- This is intentional — `PathFilterChatHandler` blocks 1-byte paths from reaching command/AI handlers
+- Welcome and path-upgrade notifications still work for these paths
 
 ## Upgrading
 

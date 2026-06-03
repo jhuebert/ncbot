@@ -3,9 +3,13 @@ package org.huebert.ncbot.dto;
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 
+import java.util.HashMap;
+import java.util.Map;
+
 @Getter
 @RequiredArgsConstructor
 public enum WeatherCode {
+    UNKNOWN(-1, "unknown"),
     CLEAR(0, "clear"),
     MOSTLY_CLEAR(1, "mostly clear"),
     PARTLY_CLOUDY(2, "partly cloudy"),
@@ -35,16 +39,21 @@ public enum WeatherCode {
     LIGHT_THUNDERSTORM_WITH_HAIL(96, "light thunderstorm with hail"),
     THUNDERSTORM_WITH_HAIL(99, "thunderstorm with hail");
 
+    private static final Map<Integer, WeatherCode> BY_CODE;
+
     private final int code;
     private final String description;
 
-    public static WeatherCode fromCode(int code) {
-        for (WeatherCode weatherCode : values()) {
-            if (weatherCode.code == code) {
-                return weatherCode;
-            }
+    static {
+        Map<Integer, WeatherCode> map = new HashMap<>();
+        for (WeatherCode code : values()) {
+            map.put(code.getCode(), code);
         }
-        throw new IllegalArgumentException("Unknown weather code: " + code);
+        BY_CODE = Map.copyOf(map);
+    }
+
+    public static WeatherCode fromCode(int code) {
+        return BY_CODE.getOrDefault(code, UNKNOWN);
     }
 
 }

@@ -1,14 +1,24 @@
 package org.huebert.ncbot.util;
 
 import com.google.common.base.Utf8;
+import org.huebert.ncbot.dto.ChatRequest;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
+import java.util.regex.Pattern;
 
 public class Truncate {
 
-    private static final String PUNCTUATION_REGEX = "[\\p{P}\\p{S}]";
-    private static final String EXTRA_WHITESPACE_REGEX = "\\s+";
+    private static final Pattern PUNCTUATION_PATTERN = Pattern.compile("[\\p{P}\\p{S}]");
+    private static final Pattern EXTRA_WHITESPACE_PATTERN = Pattern.compile("\\s+");
+
+    /**
+     * Returns {@code true} if the request is using a 1-byte path (short path).
+     */
+    public static boolean isUsingOneBytePath(ChatRequest request) {
+        Integer pathBytesPerHop = request.pathBytesPerHop();
+        return pathBytesPerHop != null && pathBytesPerHop == 1;
+    }
 
     public static String truncateUtf8(String text, int maxBytes) {
 
@@ -16,12 +26,12 @@ public class Truncate {
             return text;
         }
 
-        text = text.replaceAll(PUNCTUATION_REGEX, "").trim();
+        text = PUNCTUATION_PATTERN.matcher(text).replaceAll("").trim();
         if (Utf8.encodedLength(text) <= maxBytes) {
             return text;
         }
 
-        text = text.replaceAll(EXTRA_WHITESPACE_REGEX, " ").trim();
+        text = EXTRA_WHITESPACE_PATTERN.matcher(text).replaceAll(" ").trim();
         if (Utf8.encodedLength(text) <= maxBytes) {
             return text;
         }

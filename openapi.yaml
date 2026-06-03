@@ -1,0 +1,879 @@
+openapi: 3.1.0
+info:
+  title: ncbot Admin API
+  description: |
+    REST API for administering the ncbot chat bot — a Java-based IRC/chat bot for [Meshcore](https://meshcore.net/).
+    Provides read access to all stored entities (channels, messages, participants) and full CRUD
+    operations on AI-synthesized memories, including channel-scoped and global memory management.
+  version: 1.0.0
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+# Note: This admin API has no authentication.
+# See project docs: "Spring Data REST has no authentication — do not expose /api/data to untrusted networks."
+security: []
+
+tags:
+  - name: Channels
+    description: Browse and filter chat channels
+  - name: Messages
+    description: Query messages by channel with time-range and sort filters
+  - name: Memory
+    description: Create, read, update, delete, and promote AI-synthesized memories
+  - name: Participants
+    description: Browse users who have participated in chat channels
+
+paths:
+  /api/channels:
+    get:
+      tags:
+        - Channels
+      summary: List all channels
+      description: |
+        Returns a paginated list of all known chat channels. Optionally filter to DMs or non-DM channels.
+        Results are sorted alphabetically by `channelName`.
+      operationId: listChannels
+      parameters:
+        - name: dm
+          in: query
+          description: Filter by direct message status. Omit to return all channels.
+          required: false
+          schema:
+            type: boolean
+            enum: [true, false]
+        - name: page
+          in: query
+          description: Page number (1-indexed).
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          description: Number of items per page.
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+      responses:
+        "200":
+          description: Paginated list of channels.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseChannelDto"
+              example:
+                content:
+                  - id: 1
+                    channelKey: "#ncbot"
+                    channelName: "#ncbot"
+                    isDm: false
+                  - id: 2
+                    channelKey: "#general"
+                    channelName: "#general"
+                    isDm: false
+                  - id: 3
+                    channelKey: "d41d8cd98f00b204e9800998ecf8427e"
+                    channelName: null
+                    isDm: true
+                totalPages: 1
+                currentPage: 1
+                totalElements: 3
+        "400":
+          description: Invalid query parameter (e.g., non-integer `page`).
+
+  /api/channels/{channelId}/messages:
+    get:
+      tags:
+        - Messages
+      summary: List messages for a channel
+      description: |
+        Returns a paginated list of chat messages for the given channel, optionally filtered by
+        time range and sorted in ascending or descending order.
+      operationId: getChannelMessages
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          description: Numeric ID of the channel.
+          schema:
+            type: integer
+            format: int64
+            example: 1
+        - name: before
+          in: query
+          required: false
+          description: |
+            Only return messages created before this instant (exclusive).
+            ISO-8601 format, e.g. `2026-06-03T12:00:00Z`.
+          schema:
+            type: string
+            format: date-time
+        - name: after
+          in: query
+          required: false
+          description: |
+            Only return messages created after this instant (exclusive).
+            ISO-8601 format, e.g. `2026-06-03T08:00:00Z`.
+          schema:
+            type: string
+            format: date-time
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed).
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          required: false
+          description: Number of items per page.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: sortDirection
+          in: query
+          required: false
+          description: Sort order for the `createdAt` field.
+          schema:
+            type: string
+            enum: [ASC, DESC]
+            default: DESC
+      responses:
+        "200":
+          description: Paginated message list for the channel.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MessagesResponse"
+              example:
+                channelId: 1
+                channelName: "#ncbot"
+                messages:
+                  - id: 101
+                    senderName: "alice"
+                    content: "Hello everyone!"
+                    createdAt: "2026-06-03T14:30:00Z"
+                  - id: 100
+                    senderName: "bob"
+                    content: "Hey alice, how's it going?"
+                    createdAt: "2026-06-03T14:29:00Z"
+                totalPages: 5
+                currentPage: 1
+                totalElements: 97
+        "400":
+          description: Invalid query parameter or `channelId` not found.
+
+  /api/channels/{channelId}/memory:
+    get:
+      tags:
+        - Memory
+      summary: List channel memories
+      description: |
+        Returns a paginated list of AI-synthesized memories scoped to the given channel.
+        Results are sorted alphabetically by `key`.
+      operationId: getChannelMemory
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          description: Numeric ID of the channel.
+          schema:
+            type: integer
+            format: int64
+            example: 1
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed).
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          required: false
+          description: Number of items per page.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+      responses:
+        "200":
+          description: Paginated list of channel-scoped memories.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseMemoryDto"
+              example:
+                content:
+                  - id: 10
+                    channelId: 1
+                    key: "user.alice"
+                    value: "Alice is a regular contributor who enjoys discussing technology."
+                  - id: 11
+                    channelId: 1
+                    key: "channel.topic"
+                    value: "#ncbot focuses on bot development and deployment."
+                totalPages: 1
+                currentPage: 1
+                totalElements: 2
+        "400":
+          description: Invalid query parameter or `channelId` not found.
+    post:
+      tags:
+        - Memory
+      summary: Create a channel memory
+      description: |
+        Creates a new AI-synthesized memory scoped to the given channel.
+        The memory is persisted immediately and returned with its assigned `id`.
+      operationId: createChannelMemory
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          description: Numeric ID of the channel.
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      requestBody:
+        required: true
+        description: The key-value pair for the new memory.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemoryCreateRequest"
+            example:
+              key: "user.bob"
+              value: "Bob recently joined the channel and is learning the ropes."
+      responses:
+        "201":
+          description: Memory created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemoryDto"
+              example:
+                id: 42
+                channelId: 1
+                key: "user.bob"
+                value: "Bob recently joined the channel and is learning the ropes."
+        "400":
+          description: Invalid request body or `channelId` not found.
+
+  /api/channels/{channelId}/memory/{id}:
+    put:
+      tags:
+        - Memory
+      summary: Update a channel memory
+      description: |
+        Updates the key and/or value of an existing channel-scoped memory.
+        Validates that the memory belongs to the specified channel.
+      operationId: updateChannelMemory
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          description: Numeric ID of the channel.
+          schema:
+            type: integer
+            format: int64
+            example: 1
+        - name: id
+          in: path
+          required: true
+          description: Numeric ID of the memory to update.
+          schema:
+            type: integer
+            format: int64
+            example: 42
+      requestBody:
+        required: true
+        description: Updated key-value pair.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemoryUpdateRequest"
+            example:
+              key: "user.bob"
+              value: "Bob is now an active member and contributes regularly."
+      responses:
+        "200":
+          description: Memory updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemoryDto"
+              example:
+                id: 42
+                channelId: 1
+                key: "user.bob"
+                value: "Bob is now an active member and contributes regularly."
+        "400":
+          description: Memory not found or memory does not belong to the specified channel.
+    delete:
+      tags:
+        - Memory
+      summary: Delete a channel memory
+      description: |
+        Permanently deletes a channel-scoped memory.
+        Validates that the memory belongs to the specified channel before deleting.
+      operationId: deleteChannelMemory
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          description: Numeric ID of the channel.
+          schema:
+            type: integer
+            format: int64
+            example: 1
+        - name: id
+          in: path
+          required: true
+          description: Numeric ID of the memory to delete.
+          schema:
+            type: integer
+            format: int64
+            example: 42
+      responses:
+        "204":
+          description: Memory deleted successfully. No content returned.
+        "400":
+          description: Memory not found or memory does not belong to the specified channel.
+
+  /api/channels/{channelId}/memory/{id}/promote:
+    post:
+      tags:
+        - Memory
+      summary: Promote a channel memory to global
+      description: |
+        Copies a channel-scoped memory to the global memory store and deletes the original.
+        The promoted memory is returned with a new `id` (global scope, `channelId: null`).
+      operationId: promoteMemory
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          description: Numeric ID of the source channel.
+          schema:
+            type: integer
+            format: int64
+            example: 1
+        - name: id
+          in: path
+          required: true
+          description: Numeric ID of the memory to promote.
+          schema:
+            type: integer
+            format: int64
+            example: 42
+      responses:
+        "200":
+          description: Memory promoted to global scope.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemoryDto"
+              example:
+                id: 99
+                channelId: null
+                key: "user.bob"
+                value: "Bob is now an active member and contributes regularly."
+        "400":
+          description: Memory not found or memory does not belong to the specified channel.
+
+  /api/channels/{channelId}/participants:
+    get:
+      tags:
+        - Participants
+      summary: List participants for a channel
+      description: |
+        Returns a paginated list of unique senders (participants) who have posted in the given channel.
+        Results are sorted alphabetically by sender name.
+      operationId: getChannelParticipants
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          description: Numeric ID of the channel.
+          schema:
+            type: integer
+            format: int64
+            example: 1
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed).
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          required: false
+          description: Number of items per page.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+      responses:
+        "200":
+          description: Paginated list of channel participants.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseParticipantDto"
+              example:
+                content:
+                  - name: "alice"
+                    lastSeen: null
+                  - name: "bob"
+                    lastSeen: null
+                  - name: "charlie"
+                    lastSeen: null
+                totalPages: 1
+                currentPage: 1
+                totalElements: 3
+        "400":
+          description: Invalid query parameter or `channelId` not found.
+
+  /api/memory:
+    get:
+      tags:
+        - Memory
+      summary: List global memories
+      description: |
+        Returns a paginated list of AI-synthesized memories with global scope
+        (not tied to any channel). Results are sorted alphabetically by `key`.
+      operationId: getGlobalMemory
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed).
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          required: false
+          description: Number of items per page.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+      responses:
+        "200":
+          description: Paginated list of global memories.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseMemoryDto"
+              example:
+                content:
+                  - id: 5
+                    channelId: null
+                    key: "bot.version"
+                    value: "Running ncbot v2.3.1 with llama.cpp backend."
+                  - id: 6
+                    channelId: null
+                    key: "channel.#ncbot"
+                    value: "#ncbot is the primary development channel for bot discussions."
+                totalPages: 1
+                currentPage: 1
+                totalElements: 2
+        "400":
+          description: Invalid query parameter.
+    post:
+      tags:
+        - Memory
+      summary: Create a global memory
+      description: |
+        Creates a new AI-synthesized memory with global scope (not tied to any channel).
+        The memory is persisted immediately and returned with its assigned `id`.
+      operationId: createGlobalMemory
+      requestBody:
+        required: true
+        description: The key-value pair for the new global memory.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemoryCreateRequest"
+            example:
+              key: "bot.version"
+              value: "Running ncbot v2.3.1 with llama.cpp backend."
+      responses:
+        "201":
+          description: Global memory created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemoryDto"
+              example:
+                id: 99
+                channelId: null
+                key: "bot.version"
+                value: "Running ncbot v2.3.1 with llama.cpp backend."
+        "400":
+          description: Invalid request body.
+
+  /api/memory/{id}:
+    put:
+      tags:
+        - Memory
+      summary: Update a global memory
+      description: |
+        Updates the key and/or value of an existing global memory.
+        Validates that the memory has global scope (no associated channel).
+      operationId: updateGlobalMemory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric ID of the memory to update.
+          schema:
+            type: integer
+            format: int64
+            example: 99
+      requestBody:
+        required: true
+        description: Updated key-value pair.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/MemoryUpdateRequest"
+            example:
+              key: "bot.version"
+              value: "Running ncbot v2.4.0 with ollama backend."
+      responses:
+        "200":
+          description: Global memory updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MemoryDto"
+              example:
+                id: 99
+                channelId: null
+                key: "bot.version"
+                value: "Running ncbot v2.4.0 with ollama backend."
+        "400":
+          description: Memory not found or memory is not global (belongs to a channel).
+    delete:
+      tags:
+        - Memory
+      summary: Delete a global memory
+      description: |
+        Permanently deletes a global memory.
+        Validates that the memory has global scope before deleting.
+      operationId: deleteGlobalMemory
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Numeric ID of the memory to delete.
+          schema:
+            type: integer
+            format: int64
+            example: 99
+      responses:
+        "204":
+          description: Global memory deleted successfully. No content returned.
+        "400":
+          description: Memory not found or memory is not global (belongs to a channel).
+
+  /api/participants:
+    get:
+      tags:
+        - Participants
+      summary: List all participants with last seen
+      description: |
+        Returns a paginated list of all known participants across all channels,
+        including their last seen timestamp. Results are sorted by most recently active.
+      operationId: getAllParticipants
+      parameters:
+        - name: page
+          in: query
+          required: false
+          description: Page number (1-indexed).
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: size
+          in: query
+          required: false
+          description: Number of items per page.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+      responses:
+        "200":
+          description: Paginated list of all participants with last seen timestamps.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageResponseParticipantDto"
+              example:
+                content:
+                  - name: "alice"
+                    lastSeen: "2026-06-03T14:30:00Z"
+                  - name: "bob"
+                    lastSeen: "2026-06-03T14:29:00Z"
+                  - name: "charlie"
+                    lastSeen: "2026-06-03T12:00:00Z"
+                totalPages: 1
+                currentPage: 1
+                totalElements: 3
+        "400":
+          description: Invalid query parameter.
+
+components:
+  schemas:
+    # ── Core DTOs ──
+
+    ChannelDto:
+      type: object
+      description: A chat channel with its identifying key and name.
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique database ID of the channel.
+          example: 1
+        channelKey:
+          type: string
+          description: |
+            The unique identifier for the channel (e.g., an IRC channel name like `#ncbot`
+            or a hex-encoded key for DMs).
+          example: "#ncbot"
+        channelName:
+          type:
+            - string
+            - 'null'
+          description: |
+            Human-readable display name. May be `null` for DM channels.
+          example: "#ncbot"
+        isDm:
+          type: boolean
+          description: Whether this channel is a direct message.
+          example: false
+
+    MessageDto:
+      type: object
+      description: A single chat message with sender and timestamp.
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique database ID of the message.
+          example: 101
+        senderName:
+          type: string
+          description: Name of the user who sent the message.
+          example: "alice"
+        content:
+          type: string
+          description: The text content of the message.
+          example: "Hello everyone!"
+        createdAt:
+          type: string
+          format: date-time
+          description: ISO-8601 timestamp when the message was created.
+          example: "2026-06-03T14:30:00Z"
+
+    MemoryDto:
+      type: object
+      description: |
+        An AI-synthesized key-value memory. `channelId` is `null` for global memories
+        and set for channel-scoped memories.
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique database ID of the memory.
+          example: 42
+        channelId:
+          type:
+            - integer
+            - 'null'
+          format: int64
+          description: |
+            ID of the channel this memory belongs to. `null` for global memories.
+          example: 1
+        key:
+          type: string
+          description: |
+            Dot-namespaced key identifying the memory (e.g. `user.alice`, `channel.#ncbot`, `bot.version`).
+          example: "user.alice"
+        value:
+          type: string
+          description: The synthesized memory value (free-form text).
+          example: "Alice is a regular contributor who enjoys discussing technology."
+
+    ParticipantDto:
+      type: object
+      description: A chat participant (user) with their last seen timestamp.
+      properties:
+        name:
+          type: string
+          description: The participant's display name.
+          example: "alice"
+        lastSeen:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: |
+            ISO-8601 timestamp of the participant's most recent activity.
+            `null` when listing participants for a specific channel (historical senders only).
+          example: "2026-06-03T14:30:00Z"
+
+    # ── Request DTOs ──
+
+    MemoryCreateRequest:
+      type: object
+      required:
+        - key
+        - value
+      description: Request body for creating a new memory.
+      properties:
+        key:
+          type: string
+          description: |
+            Dot-namespaced key for the memory (e.g. `user.alice`, `bot.version`).
+          example: "user.bob"
+        value:
+          type: string
+          description: The key-value content to store.
+          example: "Bob recently joined the channel and is learning the ropes."
+
+    MemoryUpdateRequest:
+      type: object
+      required:
+        - key
+        - value
+      description: Request body for updating an existing memory.
+      properties:
+        key:
+          type: string
+          description: Updated key for the memory.
+          example: "user.bob"
+        value:
+          type: string
+          description: Updated value for the memory.
+          example: "Bob is now an active member and contributes regularly."
+
+    # ── Response Wrappers ──
+
+    MessagesResponse:
+      type: object
+      description: |
+        Paginated message list for a specific channel, including channel metadata.
+      properties:
+        channelId:
+          type: integer
+          format: int64
+          description: ID of the channel the messages belong to.
+          example: 1
+        channelName:
+          type:
+            - string
+            - 'null'
+          description: Display name of the channel.
+          example: "#ncbot"
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/MessageDto"
+          description: List of messages on this page.
+        totalPages:
+          type: integer
+          description: Total number of pages available.
+          example: 5
+        currentPage:
+          type: integer
+          description: Current page number (1-indexed).
+          example: 1
+        totalElements:
+          type: integer
+          format: int64
+          description: Total number of messages across all pages.
+          example: 97
+
+    PageResponse:
+      type: object
+      description: |
+        Generic paginated response wrapper. The `content` field type depends on context.
+      properties:
+        content:
+          type: array
+          description: The items on the current page.
+        totalPages:
+          type: integer
+          description: Total number of pages.
+          example: 1
+        currentPage:
+          type: integer
+          description: Current page number (1-indexed).
+          example: 1
+        totalElements:
+          type: integer
+          format: int64
+          description: Total number of items across all pages.
+          example: 3
+
+    # ── Parameterized Page Responses ──
+
+    PageResponseChannelDto:
+      allOf:
+        - $ref: "#/components/schemas/PageResponse"
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: "#/components/schemas/ChannelDto"
+              description: Paginated list of channels.
+
+    PageResponseMemoryDto:
+      allOf:
+        - $ref: "#/components/schemas/PageResponse"
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: "#/components/schemas/MemoryDto"
+              description: Paginated list of memories.
+
+    PageResponseParticipantDto:
+      allOf:
+        - $ref: "#/components/schemas/PageResponse"
+        - type: object
+          properties:
+            content:
+              type: array
+              items:
+                $ref: "#/components/schemas/ParticipantDto"
+              description: Paginated list of participants.

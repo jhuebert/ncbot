@@ -1,6 +1,8 @@
 package org.huebert.ncbot.repository;
 
 import org.huebert.ncbot.entity.ChatChannel;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -38,5 +40,13 @@ public interface ChatChannelRepository extends JpaRepository<ChatChannel, Long> 
             ORDER BY c.channelName ASC
             """)
     List<ChatChannel> findDmChannels();
+
+    @Query("""
+            SELECT c
+            FROM ChatChannel c
+            WHERE c.isDm = :isDm
+            ORDER BY c.channelName ASC
+            """)
+    Page<ChatChannel> findChannelsByDm(Boolean isDm, Pageable pageable);
 
 }

@@ -67,7 +67,7 @@ ncbot:
     
     # OUTPUT RULES
     - If NO meaningful changes occurred, output ONLY: `EMPTY`
-    - To DELETE or RESET a specific key, set its value to `null` (e.g., `user.john.nickname=null`).
+    - To DELETE or RESET a specific key, set its value to `__DELETE__` (e.g., `user.john.nickname=__DELETE__`).
     - To UPDATE an existing key, simply output the new `key=newValue`.
     - Output ONLY raw `key=value` pairs, one per line.
     - NO markdown, NO backticks, NO explanations, NO conversational filler.
@@ -111,13 +111,17 @@ ncbot:
   memory-partition-size: 100
   minimum-response-ms: 3000
   max-reply-bytes: 128
-  channels:
-    - name: "#ncbot"
-      welcome: true
-      path-upgrade: true
-      command: true
-      ai: EACH
+  channels-welcome: "#ncbot"
+  channels-command: "#ncbot"
+  channels-path-upgrade: "#ncbot"
+  channels-ai-each: "#ncbot"
+  channels-ai-tagged:
+  channels-ai-disabled:
   allowed-dms:
+  block-user-patterns:
+  allow-user-patterns:
+  block-path-patterns:
+  allow-path-patterns:
 
 gg:
   jte:

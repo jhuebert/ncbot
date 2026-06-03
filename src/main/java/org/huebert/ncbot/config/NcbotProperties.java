@@ -6,9 +6,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-
-import static org.huebert.ncbot.config.AiMode.*;
 
 @Slf4j
 @ConfigurationProperties(prefix = "ncbot")
@@ -19,37 +16,49 @@ public record NcbotProperties(
         int memoryPartitionSize,
         long minimumResponseMs,
         int maxReplyBytes,
-        List<ChannelProperties> channels,
-        Set<String> allowedDms,
+        List<String> channelsWelcome,
+        List<String> channelsCommand,
+        List<String> channelsPathUpgrade,
+        List<String> channelsAiEach,
+        List<String> channelsAiTagged,
+        List<String> channelsAiDisabled,
+        List<String> allowedDms,
         String welcomeContent,
         boolean condense,
         int pathUpgradeCooldownMinutes,
-        String name
+        String name,
+        List<String> blockUserPatterns,
+        List<String> allowUserPatterns,
+        List<String> blockPathPatterns,
+        List<String> allowPathPatterns
 ) {
 
-    private static final ChannelProperties DM_PROPERTIES = new ChannelProperties(null, false, false, true, EACH);
+    private static final ChannelCapabilities DM_CAPABILITIES = new ChannelCapabilities(true, false, true, AiMode.EACH);
 
-    public Optional<ChannelProperties> getChannelProperties(ChatRequest request) {
+    /**
+     * Resolve channel capabilities for a given request.
+     * DMs bypass channel lists and use default capabilities if the sender key is allowed.
+     * Non-DMs resolve from flat property lists.
+     */
+    public Optional<ChannelCapabilities> getChannelCapabilities(ChatRequest request) {
         if (request.isDm()) {
-            log.debug("getChannelProperties: DM from {}, returning default properties", request.senderKey());
-            return Optional.of(DM_PROPERTIES);
+            log.debug("getChannelCapabilities: DM from {}", request.senderKey());
+            if (!allowedDms().isEmpty() && !allowedDms().contains(request.senderKey())) {
+                log.debug("getChannelCapabilities: DM sender key {} not in allowed list", request.senderKey());
+                return Optional.empty();
+            }
+            return Optional.of(DM_CAPABILITIES);
         }
-        return channels().stream()
-                .filter(a -> a.name().equals(request.channelName()))
-                .findFirst()
-                .or(() -> {
-                    log.info("no channel config for '{}', available: {}", request.channelName(), channels().stream().map(ChannelProperties::name).toList());
-                    return Optional.empty();
-                });
+        return Optional.of(ChannelCapabilities.from(request.channelName(), this));
     }
 
-    public record ChannelProperties(
-            String name,
-            boolean welcome,
-            boolean pathUpgrade,
-            boolean command,
-            AiMode ai
-            ) {
+    /**
+     * Check whether command handling is enabled for the given request.
+     */
+    public boolean isCommandEnabled(ChatRequest request) {
+        return getChannelCapabilities(request)
+                .map(ChannelCapabilities::command)
+                .orElse(false);
     }
 
 }

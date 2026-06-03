@@ -2,6 +2,7 @@ package org.huebert.ncbot.handler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.huebert.ncbot.config.ChannelCapabilities;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
@@ -50,8 +51,8 @@ public class WelcomeChatHandler implements ChatHandler {
                 .lastSeen(now)
                 .build());
 
-        boolean welcome = ncbotProperties.getChannelProperties(request)
-                .map(NcbotProperties.ChannelProperties::welcome)
+        boolean welcome = ncbotProperties.getChannelCapabilities(request)
+                .map(ChannelCapabilities::welcome)
                 .orElse(false);
 
         if (welcome) {

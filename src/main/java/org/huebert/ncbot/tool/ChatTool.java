@@ -36,7 +36,7 @@ public class ChatTool {
     public List<String> searchUsers(
             @ToolParam(description = "Search string that returned user names must contain. Use empty or null to get all users.") String search
     ) {
-        log.debug("findUsers: {}", search);
+        log.debug("searchUsers: {}", search);
         List<ChatParticipant> chatParticipants;
         if (Strings.isNotBlank(search)) {
             chatParticipants = chatParticipantRepository.searchParticipants('%' + search.trim() + '%');

@@ -37,10 +37,7 @@ public class ChannelsChatHandler implements CommandChatHandler {
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
         log.debug("handle: command={}", matches(request, COMMANDS));
 
-        boolean command = ncbotProperties.getChannelProperties(request)
-                .map(NcbotProperties.ChannelProperties::command)
-                .orElse(false);
-        if (!command || !matches(request, COMMANDS)) {
+        if (!ncbotProperties.isCommandEnabled(request) || !matches(request, COMMANDS)) {
             return Optional.empty();
         }
 

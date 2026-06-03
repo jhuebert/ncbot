@@ -2,12 +2,14 @@ package org.huebert.ncbot.handler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.huebert.ncbot.config.ChannelCapabilities;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatParticipant;
 import org.huebert.ncbot.repository.ChatParticipantRepository;
 import org.huebert.ncbot.service.TemplateService;
+import org.huebert.ncbot.util.Truncate;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -35,15 +37,15 @@ public class PathUpgradeChatHandler implements ChatHandler {
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
         log.debug("handle: request from {} in {}", request.senderName(), request.channelName());
 
-        boolean pathUpgrade = properties.getChannelProperties(request)
-                .map(NcbotProperties.ChannelProperties::pathUpgrade)
+        boolean pathUpgrade = properties.getChannelCapabilities(request)
+                .map(ChannelCapabilities::pathUpgrade)
                 .orElse(false);
         if (!pathUpgrade) {
             log.debug("handle: pathUpgrade disabled for {}, skipping", request.channelName());
             return Optional.empty();
         }
 
-        boolean usingOneByte = isUsingOneBytePath(request);
+        boolean usingOneByte = Truncate.isUsingOneBytePath(request);
         if (!usingOneByte) {
             log.debug("handle: {} not using 1-byte path, skipping", request.senderName());
             return Optional.empty();
@@ -70,10 +72,5 @@ public class PathUpgradeChatHandler implements ChatHandler {
                 "request", request
         ));
         return Optional.of(response);
-    }
-
-    private boolean isUsingOneBytePath(ChatRequest request) {
-        Integer pathBytesPerHop = request.pathBytesPerHop();
-        return pathBytesPerHop != null && pathBytesPerHop == 1;
     }
 }

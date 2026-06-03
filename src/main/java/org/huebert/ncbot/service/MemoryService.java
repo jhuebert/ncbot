@@ -4,6 +4,7 @@ import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.huebert.ncbot.config.AiMode;
+import org.huebert.ncbot.config.ChannelCapabilities;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatMemory;
@@ -26,7 +27,7 @@ import java.util.stream.Collectors;
 @Service
 public class MemoryService {
 
-    private static final String DELETE_VALUE = "null";
+    private static final String DELETE_VALUE = "__DELETE__";
 
     private final NcbotProperties ncbotProperties;
     private final ChatClient chatClient;
@@ -35,7 +36,14 @@ public class MemoryService {
     private final ChatMessageRepository chatMessageRepository;
     private final ChatMemory2Repository chatMemoryRepository;
 
-    public MemoryService(NcbotProperties ncbotProperties, ChatChannelRepository chatChannelRepository, ChatModel chatModel, ChatMessageRepository chatMessageRepository, ChatMemory2Repository chatMemoryRepository, TemplateService templateService) {
+    public MemoryService(
+            NcbotProperties ncbotProperties,
+            ChatChannelRepository chatChannelRepository,
+            ChatModel chatModel,
+            ChatMessageRepository chatMessageRepository,
+            ChatMemory2Repository chatMemoryRepository,
+            TemplateService templateService
+    ) {
         this.ncbotProperties = ncbotProperties;
         this.chatChannelRepository = chatChannelRepository;
         this.chatMessageRepository = chatMessageRepository;
@@ -55,16 +63,8 @@ public class MemoryService {
             log.debug("channel: {}", channel);
 
             if (!channel.getIsDm()) {
-                NcbotProperties.ChannelProperties channelProperties = ncbotProperties.channels().stream()
-                        .filter(a -> a.name().equals(channel.getChannelName()))
-                        .findFirst()
-                        .orElse(null);
-                if (channelProperties == null) {
-                    log.debug("no properties for channel {}", channel.getChannelName());
-                    continue;
-                }
-                AiMode aiMode = channelProperties.ai();
-                if (aiMode == AiMode.DISABLED) {
+                ChannelCapabilities caps = ChannelCapabilities.from(channel.getChannelName(), ncbotProperties);
+                if (caps.ai() == AiMode.DISABLED) {
                     log.debug("ai disabled for channel {}, skipping", channel.getChannelName());
                     continue;
                 }
@@ -98,7 +98,7 @@ public class MemoryService {
         for (Map.Entry<String, String> entry : getUpdates(memories, messages).entrySet()) {
             ChatMemory memory = memories.get(entry.getKey());
             if (memory == null) {
-                if (!DELETE_VALUE.equalsIgnoreCase(entry.getValue())) {
+                if (!DELETE_VALUE.equals(entry.getValue())) {
                     // Added
                     log.debug("adding memory: {}", entry);
                     chatMemoryRepository.save(ChatMemory.builder()
@@ -108,7 +108,7 @@ public class MemoryService {
                             .build());
                 }
             } else if (memory.getChatChannelId() != null) {
-                if (DELETE_VALUE.equalsIgnoreCase(entry.getValue())) {
+                if (DELETE_VALUE.equals(entry.getValue())) {
                     // Deleted
                     log.debug("deleting memory: {}", entry);
                     chatMemoryRepository.delete(memory);
@@ -122,11 +122,11 @@ public class MemoryService {
         }
     }
 
-    private Map<String, String> getUpdates(Map<String, ChatMemory> memories, List<ChatMessage> messages) {
-        log.debug("getUpdates: memories size={}, messages size={}", memories.size(), messages.size());
+    private Map<String, String> getUpdates(Map<String, ChatMemory> existingMemories, List<ChatMessage> messages) {
+        log.debug("getUpdates: memories size={}, messages size={}", existingMemories.size(), messages.size());
 
         String user = templateService.render("memory", Map.of(
-                "memories", memories.values(),
+                "memories", existingMemories.values(),
                 "messages", messages
         ));
         log.debug("getUpdates: user={}", user);
