@@ -2,4 +2,5 @@
 
 @param ChatRequest request
 
-@[${request.senderName()}] ${String.join(",", request.getPathItems())}
+@[${request.senderName()}]
+${String.join(",", request.getPathItems())}

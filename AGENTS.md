@@ -1,6 +1,6 @@
 # ncbot — Agent Guide
 
-**AI chat bot for [Meshcore](https://meshcore.net/)** — receives chat messages via HTTP, processes them through a chain of handlers, runs them through an OpenAI-compatible model, and returns short responses (≤ 128 UTF-8 bytes).
+**AI chat bot for [Meshcore](https://meshcore.io/)** — receives chat messages via HTTP, processes them through a chain of handlers, runs them through an OpenAI-compatible model, and returns short responses (≤ 128 UTF-8 bytes).
 
 ---
 
@@ -379,8 +379,9 @@ All read endpoints support pagination via `?page=1&size=25` (1-indexed page, def
 
 - Update all documentation after making code changes so that the documentation stays up to date.
 - Documentation
-  - AGENTS.md (this file)
-  - README.md
+  - `AGENTS.md` (this file)
+  - `README.md`
+  - `openapi.yml`
 
 ---
 

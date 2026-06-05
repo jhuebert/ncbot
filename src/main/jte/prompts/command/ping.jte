@@ -2,4 +2,4 @@
 
 @param ChatRequest request
 
-@[${request.senderName()}] pong
+@[${request.senderName()}]
