@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: ncbot Admin API
   description: |
-    REST API for administering the ncbot chat bot — a Java-based IRC/chat bot for [Meshcore](https://meshcore.net/).
+    REST API for administering the ncbot chat bot — a Java-based chat bot for [Meshcore](https://meshcore.io/).
     Provides read access to all stored entities (channels, messages, participants) and full CRUD
     operations on AI-synthesized memories, including channel-scoped and global memory management.
   version: 1.0.0
