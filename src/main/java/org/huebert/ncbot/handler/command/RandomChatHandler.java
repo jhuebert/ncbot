@@ -11,9 +11,9 @@ import java.util.regex.Pattern;
 @Slf4j
 @RequiredArgsConstructor
 @Component
-public class PingChatHandler implements CommandHandler {
+public class RandomChatHandler implements CommandHandler {
 
-    private static final Pattern PATTERN = Pattern.compile("^(p|ping)$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern PATTERN = Pattern.compile("^(r|rand|random)$", Pattern.CASE_INSENSITIVE);
 
     @Override
     public Pattern getPattern() {
@@ -23,7 +23,8 @@ public class PingChatHandler implements CommandHandler {
     @Override
     public Map<String, Object> handle(ChatRequest request, Map<String, String> groups) {
         return Map.of(
-                "template", "command/ping"
+                "template", "command/random",
+                "value", Math.random()
         );
     }
 

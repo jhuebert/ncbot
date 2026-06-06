@@ -5,41 +5,36 @@ import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
-import org.huebert.ncbot.handler.CommandChatHandler;
 import org.huebert.ncbot.repository.ChatChannelRepository;
 import org.huebert.ncbot.repository.ChatMessageRepository;
-import org.huebert.ncbot.service.TemplateService;
 import org.huebert.ncbot.util.Truncate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
 @Component
-public class ChannelsChatHandler implements CommandChatHandler {
+public class ChannelsChatHandler implements CommandHandler {
 
-    private static final Set<String> COMMANDS = Set.of("c", "channel", "channels");
+    private static final Pattern PATTERN = Pattern.compile("^(c|channel|channels)$", Pattern.CASE_INSENSITIVE);
 
     private final NcbotProperties ncbotProperties;
-
-    private final TemplateService templateService;
 
     private final ChatChannelRepository chatChannelRepository;
 
     private final ChatMessageRepository chatMessageRepository;
 
     @Override
-    public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
-        log.debug("handle: command={}", matches(request, COMMANDS));
+    public Pattern getPattern() {
+        return PATTERN;
+    }
 
-        if (!ncbotProperties.isCommandEnabled(request) || !matches(request, COMMANDS)) {
-            return Optional.empty();
-        }
+    @Override
+    public Map<String, Object> handle(ChatRequest request, Map<String, String> groups) {
 
         Map<Long, ChatChannel> channels = chatChannelRepository.findPublicChannels().stream()
                 .collect(Collectors.toMap(ChatChannel::getId, a -> a));
@@ -49,13 +44,10 @@ public class ChannelsChatHandler implements CommandChatHandler {
                 .toList();
 
         String text = Truncate.joinWithLimit(channelNames, ncbotProperties.maxReplyBytes(), " ");
-
-        String response = templateService.render("command/channels", Map.of(
-                "request", request,
+        return Map.of(
+                "template", "command/channels",
                 "channels", text.trim()
-        ));
-        log.info("{} command from {} in {} ({} channels)", request.messageText(), request.senderName(), request.channelName(), channelNames.size());
-        return Optional.of(response);
+        );
     }
 
 }

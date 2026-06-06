@@ -9,16 +9,16 @@
 @param List<ChatMessage> messages
 @param ChatRequest request
 
-CHAT_MEMORY:
+__CHAT_MEMORY__
 @for(ChatMemory memory : memories)
 ${memory.getKey()}=${memory.getValue()}@endfor
 
-CHAT_MESSAGES:
+__CHAT_MESSAGES__
 @for(ChatMessage msg : messages)
 ${msg.getSenderName()}: ${msg.getContent()}@endfor
 ${request.senderName()}: ${request.messageText()}
 
-ADDITIONAL_CONTEXT:
+__ADDITIONAL_CONTEXT__
 
 Current Time: ${ZonedDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX"))}
 Message Routing Path: ${String.join(",", request.getPathItems())}

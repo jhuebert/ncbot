@@ -6,10 +6,10 @@
 @param Collection<ChatMemory> memories
 @param List<ChatMessage> messages
 
-CHAT_MEMORY:
+__CHAT_MEMORY__
 @for(ChatMemory memory : memories)
 ${memory.getKey()}=${memory.getValue()}@endfor
 
-CHAT_MESSAGES:
+__CHAT_MESSAGES__
 @for(ChatMessage msg : messages)
 ${msg.getSenderName()}: ${msg.getContent()}@endfor

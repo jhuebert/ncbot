@@ -4,39 +4,33 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
-import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatParticipant;
-import org.huebert.ncbot.handler.CommandChatHandler;
 import org.huebert.ncbot.repository.ChatParticipantRepository;
-import org.huebert.ncbot.service.TemplateService;
 import org.huebert.ncbot.util.Truncate;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.regex.Pattern;
 
 @Slf4j
 @RequiredArgsConstructor
 @Component
-public class UsersChatHandler implements CommandChatHandler {
+public class UsersChatHandler implements CommandHandler {
 
-    private static final Set<String> COMMANDS = Set.of("u", "user", "users");
+    private static final Pattern PATTERN = Pattern.compile("^(u|user|users)$", Pattern.CASE_INSENSITIVE);
 
     private final NcbotProperties ncbotProperties;
-
-    private final TemplateService templateService;
 
     private final ChatParticipantRepository chatParticipantRepository;
 
     @Override
-    public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
-        log.debug("handle: command={}", matches(request, COMMANDS));
+    public Pattern getPattern() {
+        return PATTERN;
+    }
 
-        if (!ncbotProperties.isCommandEnabled(request) || !matches(request, COMMANDS)) {
-            return Optional.empty();
-        }
+    @Override
+    public Map<String, Object> handle(ChatRequest request, Map<String, String> groups) {
 
         List<String> users = chatParticipantRepository.findLastSeen().stream()
                 .map(ChatParticipant::getName)
@@ -44,12 +38,10 @@ public class UsersChatHandler implements CommandChatHandler {
 
         String text = Truncate.joinWithLimit(users, ncbotProperties.maxReplyBytes(), "\n");
 
-        String response = templateService.render("command/users", Map.of(
-                "request", request,
+        return Map.of(
+                "template", "command/users",
                 "users", text.trim()
-        ));
-        log.info("{} command from {} in {} ({} users)", request.messageText(), request.senderName(), request.channelName(), users.size());
-        return Optional.of(response);
+        );
     }
 
 }

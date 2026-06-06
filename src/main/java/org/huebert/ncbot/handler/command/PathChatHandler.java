@@ -2,41 +2,29 @@ package org.huebert.ncbot.handler.command;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
-import org.huebert.ncbot.entity.ChatChannel;
-import org.huebert.ncbot.handler.CommandChatHandler;
-import org.huebert.ncbot.service.TemplateService;
 import org.springframework.stereotype.Component;
 
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
+import java.util.regex.Pattern;
 
 @Slf4j
 @RequiredArgsConstructor
 @Component
-public class PathChatHandler implements CommandChatHandler {
+public class PathChatHandler implements CommandHandler {
 
-    private static final Set<String> COMMANDS = Set.of("path", "m", "multipath", "multitest");
-
-    private final NcbotProperties ncbotProperties;
-
-    private final TemplateService templateService;
+    private static final Pattern PATTERN = Pattern.compile("^(m|path|multipath|multitest)$", Pattern.CASE_INSENSITIVE);
 
     @Override
-    public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
-        log.debug("handle: command={}", matches(request, COMMANDS));
+    public Pattern getPattern() {
+        return PATTERN;
+    }
 
-        if (!ncbotProperties.isCommandEnabled(request) || !matches(request, COMMANDS)) {
-            return Optional.empty();
-        }
-
-        String response = templateService.render("command/path", Map.of(
-                "request", request
-        ));
-        log.info("{} command from {} in {}", request.messageText(), request.senderName(), request.channelName());
-        return Optional.of(response);
+    @Override
+    public Map<String, Object> handle(ChatRequest request, Map<String, String> groups) {
+        return Map.of(
+                "template", "command/path"
+        );
     }
 
 }
