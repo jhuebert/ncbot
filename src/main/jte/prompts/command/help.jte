@@ -2,4 +2,4 @@
 
 @param ChatRequest request
 
-Commands: channels, help, path, ping, test, users
+Commands: channels, d[1-100], help, path, ping, test, users
