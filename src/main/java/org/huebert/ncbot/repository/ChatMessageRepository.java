@@ -66,15 +66,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             SELECT DISTINCT m.senderName
             FROM ChatMessage m
             WHERE m.chatChannelId = :chatChannelId
-            ORDER BY m.senderName ASC
             """)
-    List<String> findSenderNamesByChannel(Long chatChannelId);
-
-    @Query("""
-            SELECT DISTINCT m.senderName
-            FROM ChatMessage m
-            WHERE m.chatChannelId = :chatChannelId
-            """)
-    Page<String> findSenderNamesByChannel(Long chatChannelId, Pageable pageable);
+    Set<String> findSenderNamesByChannel(Long chatChannelId);
 
 }

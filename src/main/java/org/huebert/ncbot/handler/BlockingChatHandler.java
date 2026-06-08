@@ -1,5 +1,6 @@
 package org.huebert.ncbot.handler;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.huebert.ncbot.config.NcbotProperties;
@@ -7,7 +8,6 @@ import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.springframework.stereotype.Component;
 
-import java.util.List;
 import java.util.Optional;
 
 /**
@@ -21,15 +21,12 @@ import java.util.Optional;
  */
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class BlockingChatHandler implements ChatHandler {
 
     private static final int ORDER = 70;
 
     private final NcbotProperties properties;
-
-    public BlockingChatHandler(NcbotProperties properties) {
-        this.properties = properties;
-    }
 
     @Override
     public int getOrder() {
@@ -48,47 +45,35 @@ public class BlockingChatHandler implements ChatHandler {
 
     private String shouldBlock(ChatRequest request) {
 
-        String reason;
-
-        // 1. Check allowUserPatterns first — if any match, allow immediately
         String senderName = request.senderName();
-        reason = findMatchingPattern(senderName, properties.allowUserPatterns());
-        if (reason != null) {
-            log.debug("allowed user {} (matched allow pattern {})", senderName, reason);
+        if (matches(senderName, properties.allowUserPattern())) {
+            log.debug("allowed user {} (matched allow pattern {})", senderName, properties.allowUserPattern());
             return null;
         }
 
-        // 2. Check blockUserPatterns — if any match, block
-        reason = findMatchingPattern(senderName, properties.blockUserPatterns());
-        if (reason != null) {
-            return "user:" + reason;
+        if (matches(senderName, properties.blockUserPattern())) {
+            return "user:" + senderName;
         }
 
-        // Check allowPathPatterns first
         String path = Strings.join(request.getPathItems(), ',');
-        reason = findMatchingPattern(path, properties.allowPathPatterns());
-        if (reason != null) {
-            log.debug("allowed path for {} (matched allow pattern {})", senderName, reason);
+        if (matches(path, properties.allowPathPattern())) {
+            log.debug("allowed path for {} (matched allow pattern {})", senderName, properties.allowPathPattern());
             return null;
         }
 
-        // Check blockPathPatterns
-        reason = findMatchingPattern(path, properties.blockPathPatterns());
-        if (reason != null) {
-            return "path:" + reason;
+        if (matches(path, properties.blockPathPattern())) {
+            return "path:" + properties.blockPathPattern();
         }
 
+        log.debug("user {} does not match any allow or block patterns", senderName);
         return null;
     }
 
-    private String findMatchingPattern(String value, List<String> patterns) {
-        if (patterns == null) {
-            return null;
+    private boolean matches(String value, String pattern) {
+        if (Strings.isBlank(pattern)) {
+            return false;
         }
-        return patterns.stream()
-                .filter(value::matches)
-                .findAny()
-                .orElse(null);
+        return value.matches(pattern);
     }
 
 }

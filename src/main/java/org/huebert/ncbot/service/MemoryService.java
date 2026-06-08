@@ -63,7 +63,7 @@ public class MemoryService {
             log.debug("channel: {}", channel);
 
             if (!channel.getIsDm()) {
-                ChannelCapabilities caps = ChannelCapabilities.from(channel.getChannelName(), ncbotProperties);
+                ChannelCapabilities caps = ncbotProperties.getChannelCapabilities(channel.getChannelName());
                 if (caps.ai() == AiMode.DISABLED) {
                     log.debug("ai disabled for channel {}, skipping", channel.getChannelName());
                     continue;

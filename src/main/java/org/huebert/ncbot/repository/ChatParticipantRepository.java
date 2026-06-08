@@ -6,6 +6,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 
@@ -17,6 +18,13 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
             WHERE p.name = :name
             """)
     Optional<ChatParticipant> findParticipant(String name);
+
+    @Query("""
+            SELECT p
+            FROM ChatParticipant p
+            WHERE p.name IN :name
+            """)
+    Page<ChatParticipant> findParticipants(Collection<String> name, Pageable pageable);
 
     @Query("""
             SELECT p

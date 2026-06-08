@@ -1,0 +1,30 @@
+info:
+  name: Test - direct
+  type: http
+  seq: 1
+
+http:
+  method: POST
+  url: http://localhost:8080/v1/chat
+  body:
+    type: json
+    data: |
+      {
+        "senderName": "nc1v🌞",
+        "senderKey": null,
+        "messageText": "Test",
+        "isDm": false,
+        "channelKey": "2FCBD49D83E338D786458CF2CD6F1333",
+        "channelName": "#omatest",
+        "senderTimestamp": 1780879107,
+        "path": "",
+        "isOutgoing": false,
+        "pathBytesPerHop": null
+      }
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

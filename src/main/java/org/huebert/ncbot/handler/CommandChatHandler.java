@@ -38,23 +38,26 @@ public class CommandChatHandler implements ChatHandler {
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
 
         if (!ncbotProperties.isCommandEnabled(request)) {
+            log.debug("commands are not enabled for {}", chatChannel.getChannelName());
             return Optional.empty();
         }
 
         for (CommandHandler handler : commandHandlers) {
             Map<String, String> groups = getGroups(request, handler);
             if (groups == null) {
+                log.debug("command {} does not match", handler.getClass().getSimpleName());
                 continue;
             }
 
-
             Map<String, Object> handlerParams = handler.handle(request, groups);
             if (handlerParams == null) {
+                log.debug("command {} returned a null result", handler.getClass().getSimpleName());
                 continue;
             }
 
             Object template = handlerParams.get("template");
             if (template == null) {
+                log.debug("command {} did not include a template", handler.getClass().getSimpleName());
                 continue;
             }
 
@@ -67,17 +70,20 @@ public class CommandChatHandler implements ChatHandler {
     }
 
     private Map<String, String> getGroups(ChatRequest request, CommandHandler handler) {
+        log.debug("getting groups for '{}' using '{}'", request.messageText(), handler.getPattern());
         String trimmed = Optional.ofNullable(request.messageText())
                 .map(String::trim)
                 .orElse("");
         Pattern pattern = handler.getPattern();
         Matcher matcher = pattern.matcher(trimmed);
         if (!matcher.matches()) {
+            log.debug("pattern does not match");
             return null;
         }
         Map<String, String> map = new HashMap<>();
         pattern.namedGroups().keySet()
                 .forEach(name -> map.put(name, matcher.group(name)));
+        log.debug("groups for pattern '{}': {}", pattern, map);
         return map;
     }
 

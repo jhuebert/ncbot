@@ -12,12 +12,11 @@ spring:
           model: ncbot                    # Model identifier
 
 ncbot:
-  channels:
-    - name: "#ncbot"
-      welcome: true
-      path-upgrade: true
-      command: true
-      ai: EACH
+
+  channels-welcome: "#ncbot"
+  channels-command: "#ncbot"
+  channels-path-upgrade: "#ncbot"
+  channels-ai-each: "#ncbot"
 
   allowed-dms:              # Empty list allows all DMs
     - "abc123def456"        # Hex key of participants allowed to DM
