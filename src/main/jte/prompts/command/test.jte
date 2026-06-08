@@ -5,5 +5,5 @@
 @param ChatRequest request
 
 @[${request.senderName()}]
-Time: ${ZonedDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm:ss"))}
+Time: ${ZonedDateTime.now().format(DateTimeFormatter.ofPattern("H:mm:ss"))}
 Path: ${String.join(",", request.getPathItems())}

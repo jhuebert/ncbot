@@ -13,7 +13,6 @@ import org.huebert.ncbot.entity.ChatMessage;
 import org.huebert.ncbot.repository.ChatMemory2Repository;
 import org.huebert.ncbot.repository.ChatMessageRepository;
 import org.huebert.ncbot.service.TemplateService;
-import org.huebert.ncbot.tool.ChatTool;
 import org.huebert.ncbot.tool.WeatherTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -37,14 +36,19 @@ public class AiChatHandler implements ChatHandler {
     private final ChatMemory2Repository chatMemoryRepository;
 
     public AiChatHandler(
-            ChatModel chatModel, WeatherTool weatherTool, ChatTool chatTool, NcbotProperties properties, TemplateService templateService, ChatMessageRepository chatMessageRepository, ChatMemory2Repository chatMemoryRepository
+            ChatModel chatModel,
+            WeatherTool weatherTool,
+            NcbotProperties properties,
+            TemplateService templateService,
+            ChatMessageRepository chatMessageRepository,
+            ChatMemory2Repository chatMemoryRepository
     ) {
         this.properties = properties;
         this.templateService = templateService;
         this.chatMessageRepository = chatMessageRepository;
         this.chatMemoryRepository = chatMemoryRepository;
         this.chatClient = ChatClient.builder(chatModel)
-                .defaultTools(weatherTool, chatTool)
+                .defaultTools(weatherTool)
                 .build();
     }
 

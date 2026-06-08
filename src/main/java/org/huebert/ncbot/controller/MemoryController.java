@@ -4,14 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.controller.dto.MemoryDto;
 import org.huebert.ncbot.controller.dto.PageResponse;
-import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatMemory;
-import org.huebert.ncbot.entity.ChatMessage;
-import org.huebert.ncbot.entity.ChatParticipant;
-import org.huebert.ncbot.repository.ChatChannelRepository;
 import org.huebert.ncbot.repository.ChatMemory2Repository;
-import org.huebert.ncbot.repository.ChatMessageRepository;
-import org.huebert.ncbot.repository.ChatParticipantRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -19,65 +13,15 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.Instant;
-import java.util.Set;
-
 @Slf4j
 @RestController
-@RequestMapping("/api/v1")
+@RequestMapping("/v1")
 @RequiredArgsConstructor
-public class AdminController {
+public class MemoryController {
 
     private static final int DEFAULT_PAGE_SIZE = 25;
 
-    private final ChatMessageRepository messageRepository;
-    private final ChatChannelRepository channelRepository;
     private final ChatMemory2Repository memoryRepository;
-    private final ChatParticipantRepository participantRepository;
-
-    @GetMapping("/channels")
-    public PageResponse<ChatChannel> channels(
-            @RequestParam(required = false) Boolean dm,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size
-    ) {
-        log.info("admin: fetching channels (dm={}, page={}, size={})", dm, page, size);
-        Page<ChatChannel> channels;
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "channelName"));
-        if (dm != null) {
-            channels = channelRepository.findChannelsByDm(dm, pageable);
-        } else {
-            channels = channelRepository.findAll(pageable);
-        }
-        log.debug("admin: found {} channels", channels.getTotalElements());
-        return PageResponse.fromPage(channels);
-    }
-
-    @GetMapping("/channels/{channelId}/messages")
-    public PageResponse<ChatMessage> messages(
-            @PathVariable Long channelId,
-            @RequestParam(required = false) Instant before,
-            @RequestParam(required = false) Instant after,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size,
-            @RequestParam(defaultValue = "DESC") Sort.Direction sortDirection
-    ) {
-        log.info("admin: fetching messages for channel {} (page={}, size={}, before={}, after={}, sort={})",
-                channelId, page, size, before, after, sortDirection);
-        Pageable pageable = PageRequest.of(page, size, Sort.by(sortDirection, "createdAt"));
-        Page<ChatMessage> messages;
-        if (before != null && after != null) {
-            messages = messageRepository.findMessagesByChannelBetween(channelId, before, after, pageable);
-        } else if (before != null) {
-            messages = messageRepository.findMessagesByChannelBefore(channelId, before, pageable);
-        } else if (after != null) {
-            messages = messageRepository.findMessagesByChannelAfter(channelId, after, pageable);
-        } else {
-            messages = messageRepository.findMessagesByChannelOrderByCreatedDesc(channelId, pageable);
-        }
-        log.debug("admin: returning {} messages for channel {}", messages.getTotalElements(), channelId);
-        return PageResponse.fromPage(messages);
-    }
 
     @GetMapping("/channels/{channelId}/memory")
     public PageResponse<MemoryDto> getChannelMemory(
@@ -204,32 +148,6 @@ public class AdminController {
         memoryRepository.delete(source);
         log.debug("admin: promoted memory to global id={}", promoted.getId());
         return MemoryDto.from(promoted);
-    }
-
-    @GetMapping("/channels/{channelId}/participants")
-    public PageResponse<ChatParticipant> participants(
-            @PathVariable Long channelId,
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size
-    ) {
-        log.info("admin: fetching participants (channel={}, page={}, size={})", channelId, page, size);
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "name"));
-        Set<String> senders = messageRepository.findSenderNamesByChannel(channelId);
-        Page<ChatParticipant> participants = participantRepository.findParticipants(senders, pageable);
-        log.debug("admin: returning {} senders for channel {}", participants.getTotalElements(), channelId);
-        return PageResponse.fromPage(participants);
-    }
-
-    @GetMapping("/participants")
-    public PageResponse<ChatParticipant> allParticipants(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size
-    ) {
-        log.info("admin: fetching all participants (page={}, size={})", page, size);
-        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "name"));
-        Page<ChatParticipant> all = participantRepository.findLastSeen(pageable);
-        log.debug("admin: returning {} participants", all.getTotalElements());
-        return PageResponse.fromPage(all);
     }
 
     private ChatMemory requireChannelMemory(Long channelId, Long id) {

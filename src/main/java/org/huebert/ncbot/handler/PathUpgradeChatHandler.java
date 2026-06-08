@@ -9,7 +9,7 @@ import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatParticipant;
 import org.huebert.ncbot.repository.ChatParticipantRepository;
 import org.huebert.ncbot.service.TemplateService;
-import org.huebert.ncbot.util.Truncate;
+import org.huebert.ncbot.util.PathUtil;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -45,7 +45,7 @@ public class PathUpgradeChatHandler implements ChatHandler {
             return Optional.empty();
         }
 
-        boolean usingOneByte = Truncate.isUsingOneBytePath(request);
+        boolean usingOneByte = PathUtil.isUsingOneBytePath(request);
         if (!usingOneByte) {
             log.debug("handle: {} not using 1-byte path, skipping", request.senderName());
             return Optional.empty();

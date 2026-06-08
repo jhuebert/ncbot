@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
-import org.huebert.ncbot.util.Truncate;
+import org.huebert.ncbot.util.PathUtil;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -32,7 +32,7 @@ public class PathFilterChatHandler implements ChatHandler {
 
     @Override
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
-        if (!properties.allowOneBytePaths() && Truncate.isUsingOneBytePath(request)) {
+        if (!properties.allowOneBytePaths() && PathUtil.isUsingOneBytePath(request)) {
             log.debug("path filter: blocking 1-byte path for {} in {}", request.senderName(), request.channelName());
             return Optional.of(DO_NOT_RESPOND);
         }

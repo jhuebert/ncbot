@@ -6,7 +6,6 @@ import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.dto.ChatResponse;
 import org.huebert.ncbot.service.ChatService;
-import org.huebert.ncbot.util.Delay;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -37,7 +36,11 @@ public class ChatController {
                 long delay = ncbotProperties.minimumResponseMs() - (System.currentTimeMillis() - start);
                 if (delay > 0) {
                     log.debug("delaying {} ms", delay);
-                    Delay.sleep(delay);
+                    try {
+                        Thread.sleep(delay);
+                    } catch (InterruptedException e) {
+                        log.error("interrupted", e);
+                    }
                 }
             } else {
                 log.debug("no response generated");
