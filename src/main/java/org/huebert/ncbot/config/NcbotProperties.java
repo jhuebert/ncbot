@@ -43,7 +43,9 @@ public record NcbotProperties(
         String blockUser,
         String allowUser,
         String blockPath,
-        String allowPath
+        String allowPath,
+        String blockChannel,
+        String allowChannel
 ) {
 
     private static final ChannelCapabilities DM_CAPABILITIES = ChannelCapabilities.builder()

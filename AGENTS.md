@@ -78,7 +78,7 @@ Handlers implement `ChatHandler` with `getOrder()` — **larger values run first
 
 | Handler | Order | Purpose |
 |---|---|---|
-| `BlockingChatHandler` | 200 | Block user/path by regex |
+| `BlockingChatHandler` | 200 | Block user/path/channel by regex |
 | `WelcomeChatHandler` | 100 | Greet new participants |
 | `PathUpgradeChatHandler` | 75 | Notify users to upgrade path hash |
 | `PathFilterChatHandler` | 60 | Conditionally block 1-byte paths (`NCBOT_ALLOW_ONE_BYTE_PATHS`) |
@@ -116,7 +116,7 @@ ncbot:
 
 ## Blocking & Filtering
 
-### User/Path Blocking
+### User/Path/Channel Blocking
 
 Regex patterns in `application.yml`:
 
@@ -126,9 +126,13 @@ ncbot:
   allow-user: "admin.*"
   block-path: ".*malicious.*"
   allow-path: "internal.*"
+  block-channel: ".*spam.*"
+  allow-channel: "^#trusted$"
 ```
 
-**Precedence:** allow always beats block. If a user/path matches an allow pattern, they are allowed regardless.
+**Precedence:** allow always beats block at every level (user > channel > path). If a user/path/channel matches an allow pattern, they are allowed regardless of block patterns.
+
+**DMs:** Channel blocking is skipped for DMs — only user and path patterns apply.
 
 ### Path Filtering
 

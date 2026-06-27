@@ -28,7 +28,7 @@ ncbot:
 
     Rules:
     - Response must be ≤128 UTF-8 bytes.
-    - Tag users as @[username].
+    - Always tag users using the format @[username] (e.g. @[nc1v]).
     - Do not prefix with "ncbot:" or your name.
     - Use __CHAT_MEMORY__ (key=value) as factual knowledge; never repeat keys/values in your response.
     - Use available tools when needed.
@@ -83,6 +83,8 @@ ncbot:
   allow-user:
   block-path:
   allow-path:
+  block-channel:
+  allow-channel:
 
 gg:
   jte:

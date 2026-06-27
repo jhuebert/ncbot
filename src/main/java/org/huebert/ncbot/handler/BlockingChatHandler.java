@@ -66,6 +66,19 @@ public class BlockingChatHandler implements ChatHandler {
             return "path:" + properties.blockPath();
         }
 
+        // DMs skip channel-level blocking
+        if (!request.isDm()) {
+            String channelName = request.channelName();
+            if (PatternUtil.matches(channelName, properties.allowChannel())) {
+                log.debug("allowed channel {} (matched allow pattern {})", channelName, properties.allowChannel());
+                return null;
+            }
+
+            if (PatternUtil.matches(channelName, properties.blockChannel())) {
+                return "channel:" + channelName;
+            }
+        }
+
         log.debug("user {} does not match any allow or block patterns", senderName);
         return null;
     }
