@@ -6,6 +6,7 @@ import org.apache.logging.log4j.util.Strings;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
+import org.huebert.ncbot.util.PatternUtil;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -46,34 +47,27 @@ public class BlockingChatHandler implements ChatHandler {
     private String shouldBlock(ChatRequest request) {
 
         String senderName = request.senderName();
-        if (matches(senderName, properties.allowUserPattern())) {
-            log.debug("allowed user {} (matched allow pattern {})", senderName, properties.allowUserPattern());
+        if (PatternUtil.matches(senderName, properties.allowUser())) {
+            log.debug("allowed user {} (matched allow pattern {})", senderName, properties.allowUser());
             return null;
         }
 
-        if (matches(senderName, properties.blockUserPattern())) {
+        if (PatternUtil.matches(senderName, properties.blockUser())) {
             return "user:" + senderName;
         }
 
         String path = Strings.join(request.getPathItems(), ',');
-        if (matches(path, properties.allowPathPattern())) {
-            log.debug("allowed path for {} (matched allow pattern {})", senderName, properties.allowPathPattern());
+        if (PatternUtil.matches(path, properties.allowPath())) {
+            log.debug("allowed path for {} (matched allow pattern {})", senderName, properties.allowPath());
             return null;
         }
 
-        if (matches(path, properties.blockPathPattern())) {
-            return "path:" + properties.blockPathPattern();
+        if (PatternUtil.matches(path, properties.blockPath())) {
+            return "path:" + properties.blockPath();
         }
 
         log.debug("user {} does not match any allow or block patterns", senderName);
         return null;
-    }
-
-    private boolean matches(String value, String pattern) {
-        if (Strings.isBlank(pattern)) {
-            return false;
-        }
-        return value.matches(pattern);
     }
 
 }

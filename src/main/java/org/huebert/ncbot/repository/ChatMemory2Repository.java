@@ -34,4 +34,6 @@ public interface ChatMemory2Repository extends JpaRepository<ChatMemory, Long> {
             """)
     Page<ChatMemory> findGlobalMemory(Pageable pageable);
 
+    void deleteByChatChannelId(Long chatChannelId);
+
 }

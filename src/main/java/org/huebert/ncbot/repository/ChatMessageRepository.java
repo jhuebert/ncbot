@@ -22,6 +22,14 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     List<ChatMessage> findChannelMessages(Long chatChannelId, Instant start, Instant end);
 
     @Query("""
+            SELECT m
+            FROM ChatMessage m
+            WHERE m.chatChannelId = :chatChannelId AND m.createdAt > :start AND m.createdAt < :end
+            ORDER BY m.createdAt DESC
+            """)
+    List<ChatMessage> findChannelMessages(Long chatChannelId, Instant start, Instant end, Pageable pageable);
+
+    @Query("""
             SELECT new org.huebert.ncbot.util.Pair(m.chatChannelId, MAX(m.createdAt))
             FROM ChatMessage m
             WHERE m.chatChannelId IN :chatChannelIds
@@ -68,5 +76,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             WHERE m.chatChannelId = :chatChannelId
             """)
     Set<String> findSenderNamesByChannel(Long chatChannelId);
+
+    void deleteByChatChannelId(Long chatChannelId);
 
 }

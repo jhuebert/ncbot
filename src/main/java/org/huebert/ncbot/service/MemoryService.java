@@ -55,6 +55,12 @@ public class MemoryService {
 
     @Scheduled(fixedDelayString = "${ncbot.memory-update-period}")
     public void updateMemory() {
+
+        if (!ncbotProperties.useMemory() || !ncbotProperties.autoUpdateMemory()) {
+            log.debug("memory update disabled");
+            return;
+        }
+
         log.debug("updateMemory: starting");
         Instant now = Instant.now();
         long start = System.currentTimeMillis();

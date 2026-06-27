@@ -77,23 +77,13 @@ public class ChatService {
 
     private void saveInteraction(ChatChannel chatChannel, ChatRequest request, String response) {
         log.debug("saveInteraction: request={}, response={}", request.messageText(), response);
-        ChatMessage userMessage = ChatMessage.builder()
+        chatMessageRepository.save(ChatMessage.builder()
                 .chatChannelId(chatChannel.getId())
                 .content(request.messageText())
                 .createdAt(Instant.now())
                 .senderName(request.senderName())
-                .build();
-        if (response != null) {
-            ChatMessage botMessage = ChatMessage.builder()
-                    .chatChannelId(chatChannel.getId())
-                    .content(response)
-                    .createdAt(Instant.now())
-                    .senderName("ncbot")
-                    .build();
-            chatMessageRepository.saveAll(List.of(userMessage, botMessage));
-        } else {
-            chatMessageRepository.save(userMessage);
-        }
+                .response(response)
+                .build());
     }
 
     private Optional<String> generateResponse(ChatChannel chatChannel, ChatRequest request) {

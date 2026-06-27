@@ -60,6 +60,8 @@ ncbot:
     # OBJECTIVE
     Transform the current `CHAT_MEMORY` and the new `CHAT_MESSAGES` into an updated state. Prioritize "Semantic Density"—the maximum factual information using the minimum number of tokens. Memory must be lean; only store what ncbot actually needs to respond appropriately.
     
+    Do not include last_path, last_query, last_interaction, or ID memories as those are temporary
+    
     # INPUT
     1. CHAT_MEMORY: The current state of long-term memory (key=value).
     2. CHAT_MESSAGES: The latest interaction history. The username to the left of the colon is who said the message on the right.
@@ -77,6 +79,11 @@ ncbot:
     - **Remove bot response summaries:** Do not store summaries of what ncbot said or responded with. Only store what the user revealed or indicated.
     - **Prefer deletion over retention:** When in doubt, delete the memory rather than keeping it. Memory is a scarce resource—keep it focused on high-value facts.
     - **Aggressively prune:** It is better to have no memory than stale or irrelevant memory. A clean memory is a useful memory.
+    - **NEVER create transient state keys:** Do NOT create or update keys with these suffixes: `status`, `mood`, `greeting`, `activity`, `last_activity`, `last_interaction`, `last_message`, `last_query`, `last_action`, `last_seen`, `last_mention`, `last_context`, `last_path`, `last_response`, `last_ack`, `last_viewed`, `current_`, `next_`. These are ephemeral and should be discarded.
+    - **NEVER create user entries for one-off interactions:** If a user only says "hi", "test", "ping", or asks a one-time question, do NOT create a `user.*` entry for them. Only create user entries when they reveal persistent, long-term information about themselves.
+    - **Cap user memories:** Limit to at most 5-8 high-value persistent facts per user (e.g., location, role, preferences, relationships). Delete older facts when the cap is reached.
+    - **Delete duplicate/overlapping user keys:** If `user.john.status` and `user.john.current_status` both exist, keep only the more specific one and delete the other.
+    - **Never store bot interaction state:** Do not store `user.john.last_bot_interaction`, `user.john.bot_response`, or similar. The bot does not need to remember its own interactions.
     
     # DATA SCHEMA (Density Guidelines)
     To ensure the consumer (ncbot) can process information efficiently within its strict 128-byte response limit, follow these formatting rules:
@@ -96,14 +103,32 @@ ncbot:
       - *Inefficient:* `channel.joke.running=There is an ongoing gag where the user calls the bot a potato.`
       - *Efficient:* `channel.joke.running=user calls bot a potato`
     
-    # FOCUS AREAS
-    - User identity (location, nicknames, preferences, traits, relationships, roles).
-    - User-defined bot behavior/rules.
-    - Social context (ongoing jokes, rivalries, shared history).
-    - Persistent states (scores, settings, decisions made).
-    - Non-obvious information (facts not widely known in the chat).
+    # FOCUS AREAS — STRICTLY LIMITED
+    Only store persistent, long-term facts. Examples of what to keep:
+    - User identity: location, callsign, role, profession, hometown
+    - Preferences: equipment, hobbies, music, food, color, frequency
+    - Relationships: family members, partner, friendships
+    - User-defined bot behavior/rules
+    - Social context: ongoing jokes, rivalries, shared history (channel-level)
+    - Persistent states: scores, settings, decisions made
+    - Non-obvious information: facts not widely known in the chat
     - Important decisions made
+    
+    Examples of what to NEVER store:
+    - What the user is doing right now ("mowing", "driving", "asleep")
+    - How the user is feeling ("happy", "amused", "positive")
+    - Greeting patterns ("morning", "good_morning")
+    - What the user last said or asked
+    - Who the user talked to last
+    - Bot response summaries or acknowledgments
+    - One-off comments or reactions
+    - Presence/activity tracking
+    - Test results or path discovery details
   welcome-content:
+  ai-enabled: true
+  auto-update-memory: true
+  use-memory: true
+  max-chat-history: 25
   condense: true
   allow-one-byte-paths: true
   path-upgrade-cooldown-minutes: 1440
@@ -111,17 +136,16 @@ ncbot:
   memory-partition-size: 100
   minimum-response-ms: 3000
   max-reply-bytes: 128
-  channels-welcome: "#ncbot"
-  channels-command: "#ncbot"
-  channels-path-upgrade: "#ncbot"
-  channels-ai-each: "#ncbot"
-  channels-ai-tagged:
-  channels-ai-disabled:
+  channels-welcome: "^#ncbot$"
+  channels-command: "^#ncbot$"
+  channels-path-upgrade: "^#ncbot$"
+  channels-ai-each: "^#ncbot$"
+  channels-ai-tagged: ".*"
   allowed-dms:
-  block-user-pattern:
-  allow-user-pattern:
-  block-path-pattern:
-  allow-path-pattern:
+  block-user:
+  allow-user:
+  block-path:
+  allow-path:
 
 gg:
   jte:

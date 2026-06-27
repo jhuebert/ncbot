@@ -16,6 +16,8 @@ import org.huebert.ncbot.service.TemplateService;
 import org.huebert.ncbot.tool.WeatherTool;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -77,8 +79,11 @@ public class AiChatHandler implements ChatHandler {
             return Optional.empty();
         }
 
-        List<ChatMessage> messages = chatMessageRepository.findChannelMessages(chatChannel.getId(), chatChannel.getMemoryUpdatedAt(), Instant.now());
-        List<ChatMemory> memories = chatMemoryRepository.findMemory(chatChannel.getId());
+        Pageable pageable = PageRequest.of(0, properties.maxChatHistory());
+        List<ChatMessage> messages = chatMessageRepository.findChannelMessages(chatChannel.getId(), chatChannel.getMemoryUpdatedAt(), Instant.now(), pageable).reversed();
+        List<ChatMemory> memories = properties.useMemory()
+                ? chatMemoryRepository.findMemory(chatChannel.getId())
+                : List.of();
         log.debug("handle: loaded {} messages, {} memories for channel {}", messages.size(), memories.size(), chatChannel.getChannelName());
 
         String output = templateService.render("chat", Map.of(

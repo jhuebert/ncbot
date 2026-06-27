@@ -67,7 +67,7 @@ RemoteTerm will invoke `bot(**kwargs)` for every message. The script forwards it
 
 ### 3. Access the Admin API
 
-Browse entities via the custom admin API at `http://localhost:8080/api/channels`.
+Browse entities via the custom admin API at `http://localhost:8080/v1/channels`.
 
 ## Configuration
 
@@ -78,49 +78,68 @@ All configuration is via environment variables or `application.yml`:
 | `NCBOT_API_KEY` | `default-key` | API key for the OpenAI-compatible endpoint |
 | `NCBOT_OPENAI_BASE_URL` | *(from application.yml)* | Base URL for the AI server |
 | `NCBOT_MODEL` | `ncbot` | Model name/identifier |
+| `NCBOT_NAME` | `ncbot` | Bot display name |
 | `NCBOT_MINIMUM_RESPONSE_MS` | `3000` | Minimum response delay in milliseconds (0 to disable) |
 | `NCBOT_MAX_REPLY_BYTES` | `128` | Max UTF-8 bytes per reply message |
 | `NCBOT_CONDENSE` | `true` | Enable AI-based response condensing when over byte limit |
 | `NCBOT_MEMORY_UPDATE_PERIOD` | `30m` | Scheduled interval for AI memory synthesis |
 | `NCBOT_MEMORY_PARTITION_SIZE` | `100` | Number of messages per memory partition |
-| `NCBOT_WELCOME_CONTENT` | *(empty)* | Welcome message appended for new participants |
+| `NCBOT_MAX_CHAT_HISTORY` | `25` | Number of recent messages to include in AI prompts |
+| `NCBOT_AI_ENABLED` | `true` | Master switch for AI (when false, all channels default to DISABLED) |
+| `NCBOT_AUTO_UPDATE_MEMORY` | `true` | Enable scheduled memory synthesis |
+| `NCBOT_USE_MEMORY` | `true` | Include memories in AI prompts |
+| `NCBOT_ALLOW_ONE_BYTE_PATHS` | `true` | Allow 1-byte path messages through the filter |
+| `NCBOT_PATH_UPGRADE_COOLDOWN_MINUTES` | `1440` | Cooldown between path upgrade notifications |
+| `NCBOT_CHANNELS_WELCOME` | `^#ncbot$` | Regex pattern for channels that receive welcome messages |
+| `NCBOT_CHANNELS_COMMAND` | `^#ncbot$` | Regex pattern for channels that accept commands |
+| `NCBOT_CHANNELS_PATH_UPGRADE` | `^#ncbot$` | Regex pattern for path upgrade notifications |
+| `NCBOT_CHANNELS_AI_EACH` | `^#ncbot$` | Regex pattern for channels where AI responds to every message |
+| `NCBOT_CHANNELS_AI_TAGGED` | `.*` | Regex pattern for channels where AI responds only when mentioned |
+| `NCBOT_ALLOWED_DMS` | *(empty)* | Comma-separated list of allowed DM sender hex keys |
+| `NCBOT_BLOCK_USER` | *(empty)* | Regex pattern to block users by name |
+| `NCBOT_ALLOW_USER` | *(empty)* | Regex pattern to allow users (overrides block) |
+| `NCBOT_BLOCK_PATH` | *(empty)* | Regex pattern to block paths |
+| `NCBOT_ALLOW_PATH` | *(empty)* | Regex pattern to allow paths (overrides block) |
+| `NCBOT_WELCOME_CONTENT` | *(empty)* | Custom welcome message content |
+| `NCBOT_SYSTEM_PROMPT` | *(from application.yml)* | System prompt for AI |
+| `NCBOT_CONDENSE_PROMPT` | *(from application.yml)* | Prompt for response condensing |
+| `NCBOT_MEMORY_PROMPT` | *(from application.yml)* | Prompt for memory synthesis |
 
-### Channel Configuration (Flat Lists)
+### Channel Configuration (Regex Patterns)
 
-Channels are configured via comma-separated lists — one per capability. Each list contains channel names that enable that capability:
+Channels are configured via regex patterns — one per capability. Each pattern is matched against the channel name:
 
 ```yaml
 ncbot:
-  channels-welcome: "#ncbot, #general"
-  channels-command: "#ncbot, #general"
-  channels-path-upgrade: "#ncbot"
-  channels-ai-each: "#ncbot, #general"
-  channels-ai-tagged: "#quiet"
-  channels-ai-disabled: "#noai"
+  channels-welcome: "^#ncbot$"
+  channels-command: "^#ncbot$"
+  channels-path-upgrade: "^#ncbot$"
+  channels-ai-each: "^#ncbot$"
+  channels-ai-tagged: ".*"
 ```
 
-**AI Mode Precedence:**
-1. `ai-disabled` wins over `ai-tagged` and `ai-each` (explicit disable)
-2. `ai-each` wins over `ai-tagged` (respond to everything beats respond-only-on-tag)
-3. Default is `DISABLED` if channel appears in no AI list
+**AI Mode Resolution:**
+1. If `ai-enabled` is `false`, all channels default to `DISABLED`
+2. If the channel matches `channels-ai-each`, mode is `EACH` (respond to every message)
+3. If the channel matches `channels-ai-tagged`, mode is `TAGGED` (respond only when mentioned)
+4. Default is `DISABLED` if the channel matches neither AI list
 
 **Other flags** (`welcome`, `command`, `path-upgrade`) are independent boolean flags — presence in the list means `true`, absence means `false`.
 
 **Environment variable example:**
 ```bash
-NCBOT_CHANNELS_AI_EACH="#ncbot, #general"
-NCBOT_CHANNELS_AI_TAGGED="#quiet"
-NCBOT_CHANNELS_AI_DISABLED="#noai"
+NCBOT_CHANNELS_AI_EACH="^#ncbot$"
+NCBOT_CHANNELS_AI_TAGGED=".*"
 ```
 
-### Malicious User Blocking
+### User/Path Blocking
 
 ```yaml
 ncbot:
-  block-user-patterns: ".*(bot|spam|scam).*"
-  allow-user-patterns: "admin.*"
-  block-path-patterns: ".*malicious.*"
-  allow-path-patterns: "internal.*"
+  block-user: ".*(bot|spam|scam).*"
+  allow-user: "admin.*"
+  block-path: ".*malicious.*"
+  allow-path: "internal.*"
 ```
 
 **Precedence:** allow always beats block. If a user/path matches an allow pattern, they are allowed regardless of block patterns.
@@ -191,38 +210,38 @@ The AI model has access to these tools:
 
 ## Admin API
 
-Custom endpoints at `/api/*` provide read access to all entities plus full CRUD on memories. Global and channel-specific memory operations use **separate, distinct routes** (no optional channel parameters).
+Custom endpoints at `/v1/*` provide read access to all entities plus full CRUD on memories. Global and channel-specific memory operations use **separate, distinct routes** (no optional channel parameters).
 
-All read endpoints support pagination via `?page=1&size=25` (1-indexed page, default 25 per page). Responses use the generic `PageResponse<T>` wrapper:
+All read endpoints support pagination via `?page=0&size=25` (0-indexed page, default 25 per page). Responses use the generic `PageResponse<T>` wrapper:
 
 ```json
 {
   "content": [...],
   "totalPages": 5,
-  "currentPage": 2,
+  "currentPage": 0,
   "totalElements": 123
 }
 ```
 
 | Path | Method | Description |
 |------|--------|-------------|
-| `/api/channels` | GET | All channels (filter: `?dm=true\|false`) — `PageResponse<ChannelDto>` |
-| `/api/channels/{channelId}/messages` | GET | Messages (`?page`, `?size`, `?before=ISO-instant`, `?after=ISO-instant`, `?sortDirection=ASC\|DESC`) — `MessagesResponse` |
-| `/api/channels/{channelId}/memory` | GET | Channel-specific memories — `PageResponse<MemoryDto>` |
-| `/api/channels/{channelId}/memory` | POST | Create channel memory (body: `{key, value}`) — `MemoryDto` |
-| `/api/channels/{channelId}/memory/{id}` | PUT | Update channel memory (body: `{key, value}`) — validates channel match — `MemoryDto` |
-| `/api/channels/{channelId}/memory/{id}` | DELETE | Delete channel memory — validates channel match — `204 No Content` |
-| `/api/channels/{channelId}/memory/{id}/promote` | POST | Promote channel memory to global (deletes source) — `MemoryDto` |
-| `/api/channels/{channelId}/participants` | GET | Participants for a channel — `PageResponse<ParticipantDto>` |
-| `/api/memory` | GET | Global memories — `PageResponse<MemoryDto>` |
-| `/api/memory` | POST | Create global memory (body: `{key, value}`) — `MemoryDto` |
-| `/api/memory/{id}` | PUT | Update global memory (body: `{key, value}`) — validates global scope — `MemoryDto` |
-| `/api/memory/{id}` | DELETE | Delete global memory — validates global scope — `204 No Content` |
-| `/api/participants` | GET | All participants with last seen — `PageResponse<ParticipantDto>` |
+| `/v1/channels` | GET | All channels (filter: `?dm=true\|false`) — `PageResponse<ChannelDto>` |
+| `/v1/channels/{channelId}/messages` | GET | Messages (`?page`, `?size`, `?before=ISO-instant`, `?after=ISO-instant`, `?sortDirection=ASC\|DESC`) — `MessagesResponse` |
+| `/v1/channels/{channelId}/memory` | GET | Channel-specific memories — `PageResponse<MemoryDto>` |
+| `/v1/channels/{channelId}/memory` | POST | Create channel memory (body: `{key, value}`) — `MemoryDto` |
+| `/v1/channels/{channelId}/memory/{id}` | PUT | Update channel memory (body: `{key, value}`) — validates channel match — `MemoryDto` |
+| `/v1/channels/{channelId}/memory/{id}` | DELETE | Delete channel memory — validates channel match — `204 No Content` |
+| `/v1/channels/{channelId}/memory/{id}/promote` | POST | Promote channel memory to global (deletes source) — `MemoryDto` |
+| `/v1/channels/{channelId}/participants` | GET | Participants for a channel — `PageResponse<ParticipantDto>` |
+| `/v1/memory` | GET | Global memories — `PageResponse<MemoryDto>` |
+| `/v1/memory` | POST | Create global memory (body: `{key, value}`) — `MemoryDto` |
+| `/v1/memory/{id}` | PUT | Update global memory (body: `{key, value}`) — validates global scope — `MemoryDto` |
+| `/v1/memory/{id}` | DELETE | Delete global memory — validates global scope — `204 No Content` |
+| `/v1/participants` | GET | All participants with last seen — `PageResponse<ParticipantDto>` |
 
 **Validation rules:**
-- Channel memory endpoints (`/api/channels/{channelId}/memory/*`) reject requests where the memory's `chatChannelId` doesn't match the path parameter
-- Global memory endpoints (`/api/memory/*`) reject requests where the memory has a non-null `chatChannelId`
+- Channel memory endpoints (`/v1/channels/{channelId}/memory/*`) reject requests where the memory's `chatChannelId` doesn't match the path parameter
+- Global memory endpoints (`/v1/memory/*`) reject requests where the memory has a non-null `chatChannelId`
 - Promote endpoint validates source belongs to the specified channel, then copies to global and deletes the source
 
 ## Commands
@@ -275,8 +294,8 @@ SQLite database file lives at `/data/ncbot.db` inside the container. The `docker
 
 ### User Blocked Unexpectedly
 
-- Check `block-user-patterns` — the user name may match a regex
-- Use `allow-user-patterns` to whitelist specific users
+- Check `block-user` — the user name may match a regex
+- Use `allow-user` to whitelist specific users
 - Check logs for "blocked" messages
 
 ### 1-Byte Path Messages Not Responding

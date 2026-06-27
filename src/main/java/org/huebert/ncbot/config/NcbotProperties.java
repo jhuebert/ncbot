@@ -2,6 +2,7 @@ package org.huebert.ncbot.config;
 
 import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.dto.ChatRequest;
+import org.huebert.ncbot.util.PatternUtil;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.util.List;
@@ -20,6 +21,10 @@ public record NcbotProperties(
         String memoryPrompt,
         String welcomeContent,
 
+        int maxChatHistory,
+        boolean aiEnabled,
+        boolean autoUpdateMemory,
+        boolean useMemory,
         boolean condense,
         boolean allowOneBytePaths,
         int pathUpgradeCooldownMinutes,
@@ -27,19 +32,18 @@ public record NcbotProperties(
         long minimumResponseMs,
         int maxReplyBytes,
 
-        List<String> channelsWelcome,
-        List<String> channelsCommand,
-        List<String> channelsPathUpgrade,
-        List<String> channelsAiEach,
-        List<String> channelsAiTagged,
-        List<String> channelsAiDisabled,
+        String channelsWelcome,
+        String channelsCommand,
+        String channelsPathUpgrade,
+        String channelsAiEach,
+        String channelsAiTagged,
 
         List<String> allowedDms,
 
-        String blockUserPattern,
-        String allowUserPattern,
-        String blockPathPattern,
-        String allowPathPattern
+        String blockUser,
+        String allowUser,
+        String blockPath,
+        String allowPath
 ) {
 
     private static final ChannelCapabilities DM_CAPABILITIES = ChannelCapabilities.builder()
@@ -83,9 +87,9 @@ public record NcbotProperties(
 
     private ChannelCapabilities from(String channelName) {
         ChannelCapabilities result = ChannelCapabilities.builder()
-                .welcome(channelsWelcome.contains(channelName))
-                .command(channelsCommand.contains(channelName))
-                .pathUpgrade(channelsPathUpgrade.contains(channelName))
+                .welcome(PatternUtil.matches(channelName, channelsWelcome))
+                .command(PatternUtil.matches(channelName, channelsCommand))
+                .pathUpgrade(PatternUtil.matches(channelName, channelsPathUpgrade))
                 .ai(resolveAiMode(channelName))
                 .build();
         log.debug("channel capabilities for {}: {}", channelName, result);
@@ -93,13 +97,13 @@ public record NcbotProperties(
     }
 
     private AiMode resolveAiMode(String channelName) {
-        if (channelsAiDisabled.contains(channelName)) {
+        if (!aiEnabled) {
             return AiMode.DISABLED;
         }
-        if (channelsAiEach.contains(channelName)) {
+        if (PatternUtil.matches(channelName, channelsAiEach)) {
             return AiMode.EACH;
         }
-        if (channelsAiTagged.contains(channelName)) {
+        if (PatternUtil.matches(channelName, channelsAiTagged)) {
             return AiMode.TAGGED;
         }
         return AiMode.DISABLED;

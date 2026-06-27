@@ -32,4 +32,7 @@ public class ChatMessage {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "response")
+    private String response;
+
 }

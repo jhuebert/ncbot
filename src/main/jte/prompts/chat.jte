@@ -15,7 +15,8 @@ ${memory.getKey()}=${memory.getValue()}@endfor
 
 __CHAT_MESSAGES__
 @for(ChatMessage msg : messages)
-${msg.getSenderName()}: ${msg.getContent()}@endfor
+${msg.getSenderName()}: ${msg.getContent()}
+@if(msg.getResponse() != null)ncbot: ${msg.getResponse()}@endif@endfor
 ${request.senderName()}: ${request.messageText()}
 
 __ADDITIONAL_CONTEXT__
