@@ -14,7 +14,7 @@ import java.util.Optional;
 /**
  * Blocks messages from malicious users/paths based on regex allow/block lists.
  * <p>
- * Runs after welcome and path-upgrade handlers but before command and AI handlers.
+ * Runs before all other handlers.
  * Short-circuits the chain for blocked users/paths.
  * <p>
  * Precedence: allow always beats block. If a user/path matches an allow pattern,
@@ -25,7 +25,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class BlockingChatHandler implements ChatHandler {
 
-    private static final int ORDER = 70;
+    private static final int ORDER = 200;
 
     private final NcbotProperties properties;
 
