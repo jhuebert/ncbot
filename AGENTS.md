@@ -8,9 +8,8 @@
 |---|---|
 | **Entry point** | `NcbotApplication.java` (root package) |
 | **Config** | `src/main/resources/config/application.yml` or env vars prefixed `NCBOT_` |
-| **Health** | `GET http://localhost:8080/admin/health` |
 | **Chat API** | `POST /v1/chat` — public, no auth |
-| **Admin API** | `GET/POST/PUT/DELETE http://localhost:8080/v1/*` — no auth |
+| **Admin API** | `GET/POST/PUT/DELETE http://localhost:8080/v1/*` — no auth (see openapi.yml) |
 | **DB** | SQLite at `./data/ncbot.db` (mounted as `/data` in Docker) |
 | **Tests** | `./gradlew test` → `NcbotApplicationTests.java` |
 
@@ -29,11 +28,10 @@ org.huebert.ncbot/
 │   └── NcbotProperties
 ├── controller/                    # HTTP endpoints
 │   ├── ChatController             # POST /v1/chat
-│   ├── AdminController            # GET /admin/health
 │   ├── ChannelsController         # /v1/channels CRUD
 │   ├── MessagesController         # /v1/channels/{id}/messages
 │   ├── MemoryController           # /v1/memory CRUD + /v1/channels/{id}/memory
-│   └── ParticpantsController      # /v1/participants
+│   └── ParticpantsController      # /v1/participants (note: typo in class name)
 ├── service/
 │   ├── ChatService                # Orchestrates handler chain
 │   ├── MemoryService              # Scheduled memory synthesis
@@ -41,15 +39,15 @@ org.huebert.ncbot/
 │   └── WeatherService             # Open-Meteo client
 ├── handler/                       # Ordered handler chain
 │   ├── ChatHandler                # Interface with getOrder()
-│   ├── AiChatHandler              # Calls Spring AI (last resort)
+│   ├── AiChatHandler              # ORDER -100 — Spring AI fallback
 │   ├── BlockingChatHandler        # ORDER 200 — user/path blocking
 │   ├── CommandChatHandler         # ORDER 50 — shortcut commands
-│   ├── PathFilterChatHandler      # ORDER 60 — blocks 1-byte paths
+│   ├── PathFilterChatHandler      # ORDER 60 — conditionally blocks 1-byte paths
 │   ├── PathUpgradeChatHandler     # ORDER 75 — path upgrade notice
 │   ├── WelcomeChatHandler         # ORDER 100 — new participants
 │   └── command/                   # Individual command handlers
 │       ├── ChannelsChatHandler, HelpChatHandler, PathChatHandler
-│       ├── PingChatHandler, TestChatHandler, UsersChatHandler
+│       ├── DiceChatHandler, PingChatHandler, RandomChatHandler, TestChatHandler, UsersChatHandler
 ├── tool/                          # AI tools (@Component + @Tool)
 │   └── WeatherTool.java           # getCurrentWeather
 ├── entity/                        # JPA entities (Lombok)
@@ -76,14 +74,14 @@ Resources: `src/main/resources/config/` (config) · `src/main/jte/` (jte templat
 
 ## Handler Chain
 
-Handlers implement `ChatHandler` with `getOrder()` — **lower values run first**. First matching handler short-circuits the chain.
+Handlers implement `ChatHandler` with `getOrder()` — **larger values run first**. First matching handler short-circuits the chain.
 
 | Handler | Order | Purpose |
 |---|---|---|
 | `BlockingChatHandler` | 200 | Block user/path by regex |
-| `PathFilterChatHandler` | 60 | Block 1-byte paths from command/AI |
-| `PathUpgradeChatHandler` | 75 | Notify users to upgrade path hash |
 | `WelcomeChatHandler` | 100 | Greet new participants |
+| `PathUpgradeChatHandler` | 75 | Notify users to upgrade path hash |
+| `PathFilterChatHandler` | 60 | Conditionally block 1-byte paths (`NCBOT_ALLOW_ONE_BYTE_PATHS`) |
 | `CommandChatHandler` | 50 | Match shortcut commands |
 | `AiChatHandler` | -100 | Last resort — fallback to AI |
 
@@ -134,7 +132,7 @@ ncbot:
 
 ### Path Filtering
 
-1-byte paths (`pathBytesPerHop == 1`) are blocked from reaching command and AI handlers. Welcome and path-upgrade notifications still work.
+1-byte paths are **allowed by default** (`NCBOT_ALLOW_ONE_BYTE_PATHS=true`). Set to `false` to block 1-byte paths from reaching command and AI handlers. Welcome and path-upgrade notifications still work for blocked paths.
 
 ---
 
@@ -146,7 +144,7 @@ ncbot:
 - Memories are included in every AI chat prompt as `CHAT_MEMORY`
 - Memory keys use dot-separated namespaces: `user.*`, `channel.*`, `bot.*`
 
-**Storage:** `chat_memory` table, scoped to each channel or global (`channelId: null`).
+**Storage:** `chat_memory` table (entity `ChatMemory`, repository `ChatMemory2Repository`), scoped to each channel or global (`channelId: null`).
 
 ---
 
@@ -168,7 +166,7 @@ Templates in `jte/prompts/` assemble context blocks:
 
 ## Admin API
 
-Controllers live in `controller/` package. See `openapi.yml` for the full spec.
+Controllers live in `controller/` package. See `openapi.yml` for the full OpenAPI 3.1 spec (no auth).
 
 **Pagination is 0-indexed** — use `?page=0&size=25` (default page 0, default size 25). All paginated endpoints return `PageResponse<T>`:
 
@@ -185,7 +183,7 @@ Controllers live in `controller/` package. See `openapi.yml` for the full spec.
 |---|---|---|
 | `/v1/channels` | GET | All channels (`?dm=true\|false`) |
 | `/v1/channels/{channelId}` | DELETE | Delete channel + cascade |
-| `/v1/channels/{channelId}/messages` | GET | Messages (`?page`, `?size`, `?before`, `?after`, `?sortDirection`) |
+| `/v1/channels/{channelId}/messages` | GET | Messages (`?page`, `?size`, `?before=ISO-instant`, `?after=ISO-instant`, `?sortDirection=ASC\|DESC`) |
 | `/v1/channels/{channelId}/memory` | GET/POST | Channel memories |
 | `/v1/channels/{channelId}/memory/{id}` | PUT/DELETE | Update/delete channel memory |
 | `/v1/channels/{channelId}/memory/{id}/promote` | POST | Promote to global |
@@ -198,6 +196,13 @@ Controllers live in `controller/` package. See `openapi.yml` for the full spec.
 - Channel memory endpoints reject where memory's `chatChannelId` ≠ path parameter
 - Global memory endpoints reject where memory has non-null `chatChannelId`
 - Promote validates source belongs to specified channel, copies to global, deletes source
+
+**Request DTOs** (all in `controller.dto` package):
+
+| DTO | Fields |
+|---|---|
+| `MemoryCreateRequest` | `key`, `value` |
+| `MemoryUpdateRequest` | `key`, `value` |
 
 **Response DTOs** (all in `controller.dto` package):
 
@@ -232,6 +237,7 @@ Controllers live in `controller/` package. See `openapi.yml` for the full spec.
 ### Documentation
 
 - Update all three docs after code changes: `AGENTS.md`, `README.md`, `openapi.yml`
+- Environment variables use `NCBOT_` prefix; application.yml uses snake_case (e.g., `NCBOT_AI_ENABLED` ↔ `ncbot.ai-enabled`)
 
 ---
 
@@ -239,10 +245,10 @@ Controllers live in `controller/` package. See `openapi.yml` for the full spec.
 
 ### Adding a New Command
 
-1. Create a class in `handler/command/` implementing `CommandChatHandler`
-2. Define the command strings in a `Set<String>` constant
-3. Check `ChannelCapabilities.command()` before responding
-4. Add a jte prompt template in `jte/prompts/command/`
+1. Create a class in `handler/command/` implementing `CommandHandler`
+2. Define the command pattern as a `Pattern` constant (regex, case-insensitive by convention)
+3. Return a `Map<String, Object>` with a `template` key pointing to a jte template
+4. Add a jte template in `src/main/jte/command/`
 
 ### Adding a New AI Tool
 
@@ -277,6 +283,6 @@ Controllers live in `controller/` package. See `openapi.yml` for the full spec.
 | Slow responses | High `NCBOT_MINIMUM_RESPONSE_MS` or slow model | Reduce delay or use faster model |
 | Template errors | jte compile failure | Check `src/main/jte/` syntax; run `./gradlew build` |
 | User blocked unexpectedly | Regex in `block-user` matches | Check patterns; use `allow-user` to whitelist |
-| 1-byte path messages not responding | `PathFilterChatHandler` blocks them | Intentional — welcome/upgrade still work |
+| 1-byte path messages not responding | `NCBOT_ALLOW_ONE_BYTE_PATHS=false` or path is 1-byte | Check setting; set to `true` to allow, or handler order is correct |
 
 **Check logs:** `docker compose logs ncbot` or `./gradlew bootRun`

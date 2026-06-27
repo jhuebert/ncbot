@@ -14,15 +14,13 @@ flowchart TD
         HC --> BH["BlockingChatHandler"]
         BH -->|blocked| SKIP["Short-circuit"]
         BH --> PFC["PathFilterChatHandler"]
-        PFC -->|1-byte path| SKIP
+        PFC -->|1-byte path (if blocked)| SKIP
         PFC --> WH["WelcomeChatHandler"]
         WH --> PU["PathUpgradeChatHandler"]
         PU --> CMD["CommandChatHandler"]
         CMD --> AIH["AiChatHandler"]
         AIH --> AIS["AI Chat Service (Spring AI)"]
         AIS -->|Tools| T1["getCurrentWeather"]
-        AIS -->|Tools| T2["getKnownChannels"]
-        AIS -->|Tools| T3["searchUsers"]
         CS --> REPO["Repositories (JPA + SQLite)"]
         REPO --> CM["ChatMessage"]
         REPO --> CHAN["ChatChannel"]
@@ -32,7 +30,7 @@ flowchart TD
     end
 ```
 
-**Handler chain** — lower `getOrder()` runs first; `AiChatHandler` is the last resort.
+**Handler chain** — larger `getOrder()` runs first; `AiChatHandler` is the last resort.
 
 ## Prerequisites
 
@@ -205,8 +203,6 @@ The AI model has access to these tools:
 | Tool | Description |
 |------|-------------|
 | `getCurrentWeather` | Get current weather by latitude/longitude (via Open-Meteo). Returns temperature (°F), wind speed (mph), wind direction (°), humidity (%), and conditions. |
-| `getKnownChannels` | List all known Meshcore channels the bot has seen |
-| `searchUsers` | Search for users by name substring |
 
 ## Admin API
 
@@ -246,16 +242,18 @@ All read endpoints support pagination via `?page=0&size=25` (0-indexed page, def
 
 ## Commands
 
-Commands are per-channel (controlled by the `channels-command` list). They are matched case-insensitively and use single-letter aliases:
+Commands are per-channel (controlled by the `channels-command` list). They are matched case-insensitively:
 
-| Command | Alias | Response |
-|---------|-------|----------|
+| Command | Aliases | Response |
+|---------|---------|----------|
 | `help` | `h` | List of available commands |
 | `ping` | `p` | "pong" |
-| `path` | `m` | Hex-encoded routing path decoded into hops |
+| `path` | `m`, `multipath`, `multitest` | Hex-encoded routing path decoded into hops |
 | `test` | `t` | Connection info (time, path) |
-| `users` | `u` | List of known users |
-| `channels` | `c` | List of known channels |
+| `users` | `u`, `user` | List of known users |
+| `channels` | `c`, `channel` | List of known channels |
+| `dice` | — | Roll a die: `d<sides>` (e.g., `d20`) |
+| `random` | `r`, `rand` | Random float between 0 and 1 |
 
 ## Database
 
@@ -300,8 +298,9 @@ SQLite database file lives at `/data/ncbot.db` inside the container. The `docker
 
 ### 1-Byte Path Messages Not Responding
 
-- This is intentional — `PathFilterChatHandler` blocks 1-byte paths from reaching command/AI handlers
-- Welcome and path-upgrade notifications still work for these paths
+- 1-byte paths are **allowed by default** (`NCBOT_ALLOW_ONE_BYTE_PATHS=true`). If set to `false`, `PathFilterChatHandler` blocks them from reaching command/AI handlers.
+- Welcome and path-upgrade notifications still work for blocked paths.
+- Check `NCBOT_ALLOW_ONE_BYTE_PATHS` setting if 1-byte path messages are unexpectedly blocked.
 
 ## Upgrading
 

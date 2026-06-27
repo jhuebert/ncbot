@@ -7,10 +7,10 @@
 @param List<ChatMessage> messages
 
 __CHAT_MEMORY__
-@for(ChatMemory memory : memories)
-${memory.getKey()}=${memory.getValue()}@endfor
+@for(ChatMemory m : memories)
+${m.getKey()}=${m.getValue()}@endfor
 
 __CHAT_MESSAGES__
-@for(ChatMessage msg : messages)
-${msg.getSenderName()}: ${msg.getContent()}
-@if(msg.getResponse() != null)ncbot: ${msg.getResponse()}@endif@endfor
+@for(ChatMessage m : messages)
+${m.getSenderName()}: ${m.getContent()}
+@if(m.getResponse() != null)ncbot: ${m.getResponse()}@endif@endfor

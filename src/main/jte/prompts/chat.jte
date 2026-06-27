@@ -21,5 +21,5 @@ ${request.senderName()}: ${request.messageText()}
 
 __ADDITIONAL_CONTEXT__
 
-Current Time: ${ZonedDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX"))}
-Message Routing Path: ${String.join(",", request.getPathItems())}
+Time: ${ZonedDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX"))}
+Path: ${String.join(",", request.getPathItems())}
