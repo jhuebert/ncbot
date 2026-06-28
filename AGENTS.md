@@ -26,15 +26,17 @@ org.huebert.ncbot/
 │   ├── AiMode                     # DISABLED, EACH, TAGGED
 │   ├── ChannelCapabilities        # Resolved channel capabilities
 │   └── NcbotProperties
-├── controller/                    # HTTP endpoints
+├── controller/                    # HTTP endpoints (thin — delegates to services)
 │   ├── ChatController             # POST /v1/chat
 │   ├── ChannelsController         # /v1/channels CRUD
 │   ├── MessagesController         # /v1/channels/{id}/messages
 │   ├── MemoryController           # /v1/memory CRUD + /v1/channels/{id}/memory
-│   └── ParticpantsController      # /v1/participants (note: typo in class name)
+│   └── ParticipantsController     # /v1/participants
 ├── service/
+│   ├── ChannelService             # Channel CRUD (delete with cascade)
 │   ├── ChatService                # Orchestrates handler chain
-│   ├── MemoryService              # Scheduled memory synthesis
+│   ├── MemoryService              # Scheduled memory synthesis + memory CRUD
+│   ├── ParticipantService         # Participant queries
 │   ├── TemplateService            # jte rendering
 │   └── WeatherService             # Open-Meteo client
 ├── handler/                       # Ordered handler chain
@@ -231,6 +233,14 @@ Controllers live in `controller/` package. See `openapi.yml` for the full OpenAP
 - **Component registration** — all handlers, tools, and services are `@Component` beans (auto-discovered)
 - **SQLite** — JPA `ddl-auto: update`, dialect is `SQLiteDialect` via `hibernate-community-dialects`
 - **Braces required** on all conditionals, loops, etc.
+
+### Transaction Boundaries
+
+- **All controllers are thin** — business logic lives in services; controllers only parse input, call services, format output
+- **`@Transactional` on every service method** that writes to the database — ensures atomicity of multi-step operations
+- **`@Transactional(readOnly = true)` on read-only service methods** — enables Hibernate read-only optimizations
+- **Multi-step operations** (e.g., delete channel with cascade, promote memory, create+save) are always wrapped in a single transaction
+- **Services handle validation** — entity ownership checks, cross-entity consistency (e.g., memory belongs to channel) are in service methods, not controllers
 
 ### Testing
 

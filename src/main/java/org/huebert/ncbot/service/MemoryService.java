@@ -15,8 +15,11 @@ import org.huebert.ncbot.repository.ChatMessageRepository;
 import org.huebert.ncbot.util.DebugLog;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.HashMap;
@@ -53,6 +56,95 @@ public class MemoryService {
         this.chatClient = ChatClient.builder(chatModel)
                 .build();
     }
+
+    // ── CRUD operations ──────────────────────────────────────────────
+
+    @Transactional(readOnly = true)
+    public Page<ChatMemory> findChannelMemory(Long channelId, Pageable pageable) {
+        return chatMemoryRepository.findChannelMemory(channelId, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<ChatMemory> findGlobalMemory(Pageable pageable) {
+        return chatMemoryRepository.findGlobalMemory(pageable);
+    }
+
+    @Transactional
+    public ChatMemory createChannelMemory(Long channelId, String key, String value) {
+        return chatMemoryRepository.save(ChatMemory.builder()
+                .chatChannelId(channelId)
+                .key(key)
+                .value(value)
+                .build());
+    }
+
+    @Transactional
+    public ChatMemory createGlobalMemory(String key, String value) {
+        return chatMemoryRepository.save(ChatMemory.builder()
+                .chatChannelId(null)
+                .key(key)
+                .value(value)
+                .build());
+    }
+
+    @Transactional
+    public ChatMemory updateChannelMemory(Long channelId, Long id, String key, String value) {
+        ChatMemory memory = requireChannelMemory(channelId, id);
+        memory.setKey(key);
+        memory.setValue(value);
+        return chatMemoryRepository.save(memory);
+    }
+
+    @Transactional
+    public ChatMemory updateGlobalMemory(Long id, String key, String value) {
+        ChatMemory memory = requireGlobalMemory(id);
+        memory.setKey(key);
+        memory.setValue(value);
+        return chatMemoryRepository.save(memory);
+    }
+
+    @Transactional
+    public void deleteChannelMemory(Long channelId, Long id) {
+        chatMemoryRepository.delete(requireChannelMemory(channelId, id));
+    }
+
+    @Transactional
+    public void deleteGlobalMemory(Long id) {
+        chatMemoryRepository.delete(requireGlobalMemory(id));
+    }
+
+    @Transactional
+    public ChatMemory promoteMemory(Long channelId, Long id) {
+        ChatMemory source = requireChannelMemory(channelId, id);
+        ChatMemory promoted = ChatMemory.builder()
+                .chatChannelId(null)
+                .key(source.getKey())
+                .value(source.getValue())
+                .build();
+        chatMemoryRepository.save(promoted);
+        chatMemoryRepository.delete(source);
+        return promoted;
+    }
+
+    private ChatMemory requireChannelMemory(Long channelId, Long id) {
+        ChatMemory memory = chatMemoryRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Memory not found: " + id));
+        if (!channelId.equals(memory.getChatChannelId())) {
+            throw new IllegalArgumentException("Memory does not belong to channel " + channelId);
+        }
+        return memory;
+    }
+
+    private ChatMemory requireGlobalMemory(Long id) {
+        ChatMemory memory = chatMemoryRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Memory not found: " + id));
+        if (memory.getChatChannelId() != null) {
+            throw new IllegalArgumentException("Memory is not global");
+        }
+        return memory;
+    }
+
+    // ── Scheduled memory synthesis ───────────────────────────────────
 
     @Scheduled(fixedDelayString = "${ncbot.memory-update-period}")
     @DebugLog

@@ -4,8 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.controller.dto.MemoryDto;
 import org.huebert.ncbot.controller.dto.PageResponse;
-import org.huebert.ncbot.entity.ChatMemory;
-import org.huebert.ncbot.repository.ChatMemory2Repository;
+import org.huebert.ncbot.service.MemoryService;
 import org.huebert.ncbot.util.DebugLog;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -21,7 +20,7 @@ public class MemoryController {
 
     private static final int DEFAULT_PAGE_SIZE = 25;
 
-    private final ChatMemory2Repository memoryRepository;
+    private final MemoryService memoryService;
 
     @DebugLog
     @GetMapping("/channels/{channelId}/memory")
@@ -31,7 +30,7 @@ public class MemoryController {
             @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "key"));
-        return PageResponse.fromPage(memoryRepository.findChannelMemory(channelId, pageable), MemoryDto::from);
+        return PageResponse.fromPage(memoryService.findChannelMemory(channelId, pageable), MemoryDto::from);
     }
 
     @DebugLog
@@ -41,7 +40,7 @@ public class MemoryController {
             @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "key"));
-        return PageResponse.fromPage(memoryRepository.findGlobalMemory(pageable), MemoryDto::from);
+        return PageResponse.fromPage(memoryService.findGlobalMemory(pageable), MemoryDto::from);
     }
 
     @DebugLog
@@ -50,12 +49,7 @@ public class MemoryController {
             @PathVariable Long channelId,
             @RequestBody MemoryDto request
     ) {
-        ChatMemory memory = ChatMemory.builder()
-                .chatChannelId(channelId)
-                .key(request.key())
-                .value(request.value())
-                .build();
-        return MemoryDto.from(memoryRepository.save(memory));
+        return MemoryDto.from(memoryService.createChannelMemory(channelId, request.key(), request.value()));
     }
 
     @DebugLog
@@ -63,12 +57,7 @@ public class MemoryController {
     public MemoryDto createGlobalMemory(
             @RequestBody MemoryDto request
     ) {
-        ChatMemory memory = ChatMemory.builder()
-                .chatChannelId(null)
-                .key(request.key())
-                .value(request.value())
-                .build();
-        return MemoryDto.from(memoryRepository.save(memory));
+        return MemoryDto.from(memoryService.createGlobalMemory(request.key(), request.value()));
     }
 
     @DebugLog
@@ -78,10 +67,7 @@ public class MemoryController {
             @PathVariable Long id,
             @RequestBody MemoryDto request
     ) {
-        ChatMemory memory = requireChannelMemory(channelId, id);
-        memory.setKey(request.key());
-        memory.setValue(request.value());
-        return MemoryDto.from(memoryRepository.save(memory));
+        return MemoryDto.from(memoryService.updateChannelMemory(channelId, id, request.key(), request.value()));
     }
 
     @DebugLog
@@ -90,10 +76,7 @@ public class MemoryController {
             @PathVariable Long id,
             @RequestBody MemoryDto request
     ) {
-        ChatMemory memory = requireGlobalMemory(id);
-        memory.setKey(request.key());
-        memory.setValue(request.value());
-        return MemoryDto.from(memoryRepository.save(memory));
+        return MemoryDto.from(memoryService.updateGlobalMemory(id, request.key(), request.value()));
     }
 
     @DebugLog
@@ -102,7 +85,7 @@ public class MemoryController {
             @PathVariable Long channelId,
             @PathVariable Long id
     ) {
-        memoryRepository.delete(requireChannelMemory(channelId, id));
+        memoryService.deleteChannelMemory(channelId, id);
         return ResponseEntity.noContent().build();
     }
 
@@ -111,7 +94,7 @@ public class MemoryController {
     public ResponseEntity<Void> deleteGlobalMemory(
             @PathVariable Long id
     ) {
-        memoryRepository.delete(requireGlobalMemory(id));
+        memoryService.deleteGlobalMemory(id);
         return ResponseEntity.noContent().build();
     }
 
@@ -121,33 +104,7 @@ public class MemoryController {
             @PathVariable Long channelId,
             @PathVariable Long id
     ) {
-        ChatMemory source = requireChannelMemory(channelId, id);
-        ChatMemory promoted = ChatMemory.builder()
-                .chatChannelId(null)
-                .key(source.getKey())
-                .value(source.getValue())
-                .build();
-        memoryRepository.save(promoted);
-        memoryRepository.delete(source);
-        return MemoryDto.from(promoted);
-    }
-
-    private ChatMemory requireChannelMemory(Long channelId, Long id) {
-        ChatMemory memory = memoryRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Memory not found: " + id));
-        if (!channelId.equals(memory.getChatChannelId())) {
-            throw new IllegalArgumentException("Memory does not belong to channel " + channelId);
-        }
-        return memory;
-    }
-
-    private ChatMemory requireGlobalMemory(Long id) {
-        ChatMemory memory = memoryRepository.findById(id)
-                .orElseThrow(() -> new IllegalArgumentException("Memory not found: " + id));
-        if (memory.getChatChannelId() != null) {
-            throw new IllegalArgumentException("Memory is not global");
-        }
-        return memory;
+        return MemoryDto.from(memoryService.promoteMemory(channelId, id));
     }
 
 }

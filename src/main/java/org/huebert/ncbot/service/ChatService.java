@@ -13,6 +13,7 @@ import org.huebert.ncbot.repository.ChatMessageRepository;
 import org.huebert.ncbot.util.DebugLog;
 import org.huebert.ncbot.util.Truncate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.ArrayList;
@@ -45,6 +46,7 @@ public class ChatService {
         Collections.sort(this.handlers);
     }
 
+    @Transactional
     @DebugLog
     public ChatResponse processMessage(ChatRequest request) {
 
