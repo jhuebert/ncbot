@@ -2,6 +2,8 @@ server:
   port: 8080
 
 spring:
+  main:
+    banner-mode: off
   application:
     name: ncbot
   datasource:
@@ -92,6 +94,8 @@ gg:
     use-precompiled-templates: true
 
 logging:
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss.SSS} %level %logger{0} : %msg%n"
   level:
     root: WARN
     org.huebert: INFO

@@ -12,6 +12,7 @@ import org.huebert.ncbot.entity.ChatMessage;
 import org.huebert.ncbot.repository.ChatChannelRepository;
 import org.huebert.ncbot.repository.ChatMemory2Repository;
 import org.huebert.ncbot.repository.ChatMessageRepository;
+import org.huebert.ncbot.util.DebugLog;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -54,16 +55,14 @@ public class MemoryService {
     }
 
     @Scheduled(fixedDelayString = "${ncbot.memory-update-period}")
+    @DebugLog
     public void updateMemory() {
 
         if (!ncbotProperties.useMemory() || !ncbotProperties.autoUpdateMemory()) {
             log.debug("memory update disabled");
             return;
         }
-
-        log.debug("updateMemory: starting");
         Instant now = Instant.now();
-        long start = System.currentTimeMillis();
 
         for (ChatChannel channel : chatChannelRepository.findAll()) {
             log.debug("channel: {}", channel);
@@ -89,9 +88,6 @@ public class MemoryService {
             channel.setMemoryUpdatedAt(now);
             chatChannelRepository.save(channel);
         }
-
-        long elapsed = System.currentTimeMillis() - start;
-        log.info("updateMemory completed in {} ms", elapsed);
     }
 
     private void updateMemory(ChatChannel channel, List<ChatMessage> messages) {

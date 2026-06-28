@@ -6,6 +6,7 @@ import org.huebert.ncbot.dto.WeatherApiResponse;
 import org.huebert.ncbot.dto.WeatherCode;
 import org.huebert.ncbot.dto.WeatherToolResponse;
 import org.huebert.ncbot.service.WeatherService;
+import org.huebert.ncbot.util.DebugLog;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -17,13 +18,13 @@ public class WeatherTool {
 
     private final WeatherService weatherService;
 
+    @DebugLog
     @Tool(description = "Get current weather for a location")
     public WeatherToolResponse getCurrentWeather(
             @ToolParam(description = "Latitude") double latitude,
             @ToolParam(description = "Longitude") double longitude
     ) {
-        log.debug("getCurrentWeather: latitude={}, longitude={}", latitude, longitude);
-        WeatherToolResponse result = weatherService.getWeather(latitude, longitude)
+        return weatherService.getWeather(latitude, longitude)
                 .map(r -> WeatherToolResponse.builder()
                         .conditions(WeatherCode.fromCode(r.current().weatherCode()).getDescription())
                         .temperature(getTemperature(r))
@@ -32,8 +33,6 @@ public class WeatherTool {
                         .windDirection(r.current().windDirection10m())
                         .build())
                 .orElse(null);
-        log.debug("getCurrentWeather result: {}", result);
-        return result;
     }
 
     private static int getTemperature(WeatherApiResponse response) {

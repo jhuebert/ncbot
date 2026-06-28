@@ -2,6 +2,7 @@ package org.huebert.ncbot.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.dto.WeatherApiResponse;
+import org.huebert.ncbot.util.DebugLog;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -22,8 +23,8 @@ public class WeatherService {
         this.restClient = RestClient.create();
     }
 
+    @DebugLog
     public Optional<WeatherApiResponse> getWeather(double latitude, double longitude) {
-        log.debug("getWeather: latitude={}, longitude={}", latitude, longitude);
         ResponseEntity<WeatherApiResponse> weatherResponse = restClient.get()
                 .uri(WEATHER_BASE + "?latitude={lat}&longitude={lon}&current={fields}",
                         latitude, longitude, CURRENT_FIELDS)
@@ -33,9 +34,7 @@ public class WeatherService {
             log.error("error encountered during weather fetch: {}", weatherResponse);
             return Optional.empty();
         }
-        WeatherApiResponse result = weatherResponse.getBody();
-        log.debug("getWeather result: {}", result);
-        return Optional.ofNullable(result);
+        return Optional.ofNullable(weatherResponse.getBody());
     }
 
 }

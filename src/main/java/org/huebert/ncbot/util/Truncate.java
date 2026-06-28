@@ -1,7 +1,6 @@
 package org.huebert.ncbot.util;
 
 import com.google.common.base.Utf8;
-import org.huebert.ncbot.dto.ChatRequest;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;

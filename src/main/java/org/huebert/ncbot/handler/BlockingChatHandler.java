@@ -6,6 +6,7 @@ import org.apache.logging.log4j.util.Strings;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
+import org.huebert.ncbot.util.DebugLog;
 import org.huebert.ncbot.util.PatternUtil;
 import org.springframework.stereotype.Component;
 
@@ -35,6 +36,7 @@ public class BlockingChatHandler implements ChatHandler {
     }
 
     @Override
+    @DebugLog
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
         String reason = shouldBlock(request);
         if (reason != null) {

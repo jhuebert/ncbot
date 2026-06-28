@@ -5,6 +5,7 @@ import gg.jte.TemplateOutput;
 import gg.jte.output.StringOutput;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.huebert.ncbot.util.DebugLog;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
@@ -16,11 +17,10 @@ public class TemplateService {
 
     private final TemplateEngine templateEngine;
 
+    @DebugLog
     public String render(String template, Map<String, Object> model) {
-        log.debug("render: template={}, model={}", template, model);
         TemplateOutput output = new StringOutput();
         templateEngine.render("prompts/" + template + ".jte", model, output);
-        log.debug("render result: {}", output);
         return output.toString().trim();
     }
 }

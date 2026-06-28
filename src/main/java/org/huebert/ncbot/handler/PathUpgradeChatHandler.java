@@ -9,6 +9,7 @@ import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatParticipant;
 import org.huebert.ncbot.repository.ChatParticipantRepository;
 import org.huebert.ncbot.service.TemplateService;
+import org.huebert.ncbot.util.DebugLog;
 import org.huebert.ncbot.util.PathUtil;
 import org.springframework.stereotype.Component;
 
@@ -34,8 +35,8 @@ public class PathUpgradeChatHandler implements ChatHandler {
     }
 
     @Override
+    @DebugLog
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
-        log.debug("handle: request from {} in {}", request.senderName(), request.channelName());
 
         boolean pathUpgrade = properties.getChannelCapabilities(request)
                 .map(ChannelCapabilities::pathUpgrade)
@@ -64,7 +65,7 @@ public class PathUpgradeChatHandler implements ChatHandler {
             return Optional.empty();
         }
 
-        log.info("path upgrade notification sent to {} in {}", request.senderName(), request.channelName());
+        log.debug("path upgrade notification sent to {} in {}", request.senderName(), request.channelName());
         participant.setPathUpgradeNotifiedAt(Instant.now());
         chatParticipantRepository.save(participant);
 

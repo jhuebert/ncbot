@@ -7,6 +7,7 @@ import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.handler.command.CommandHandler;
 import org.huebert.ncbot.service.TemplateService;
+import org.huebert.ncbot.util.DebugLog;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
@@ -35,6 +36,7 @@ public class CommandChatHandler implements ChatHandler {
     }
 
     @Override
+    @DebugLog
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
 
         if (!ncbotProperties.isCommandEnabled(request)) {
@@ -70,7 +72,6 @@ public class CommandChatHandler implements ChatHandler {
     }
 
     private Map<String, String> getGroups(ChatRequest request, CommandHandler handler) {
-        log.debug("getting groups for '{}' using '{}'", request.messageText(), handler.getPattern());
         String trimmed = Optional.ofNullable(request.messageText())
                 .map(String::trim)
                 .orElse("");

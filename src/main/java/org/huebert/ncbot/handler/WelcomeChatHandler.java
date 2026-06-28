@@ -9,6 +9,7 @@ import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatParticipant;
 import org.huebert.ncbot.repository.ChatParticipantRepository;
 import org.huebert.ncbot.service.TemplateService;
+import org.huebert.ncbot.util.DebugLog;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
@@ -32,8 +33,8 @@ public class WelcomeChatHandler implements ChatHandler {
     }
 
     @Override
+    @DebugLog
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
-        log.debug("handle: request from {} in {}", request.senderName(), request.channelName());
 
         ChatParticipant participant = chatParticipantRepository.findParticipant(request.senderName()).orElse(null);
         if (participant != null) {
@@ -44,7 +45,7 @@ public class WelcomeChatHandler implements ChatHandler {
         }
 
         Instant now = Instant.now();
-        log.info("new participant: {}", request.senderName());
+        log.debug("new participant: {}", request.senderName());
         chatParticipantRepository.save(ChatParticipant.builder()
                 .name(request.senderName())
                 .firstSeen(now)
@@ -56,7 +57,7 @@ public class WelcomeChatHandler implements ChatHandler {
                 .orElse(false);
 
         if (welcome) {
-            log.info("welcome sent to {} in {}", request.senderName(), request.channelName());
+            log.debug("welcome sent to {} in {}", request.senderName(), request.channelName());
             String response = templateService.render("welcome", Map.of(
                     "request", request,
                     "welcomeContent", ncbotProperties.welcomeContent()

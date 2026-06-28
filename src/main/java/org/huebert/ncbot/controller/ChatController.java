@@ -6,6 +6,7 @@ import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.dto.ChatResponse;
 import org.huebert.ncbot.service.ChatService;
+import org.huebert.ncbot.util.DebugLog;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,10 +26,10 @@ public class ChatController {
     private final NcbotProperties ncbotProperties;
 
     @PostMapping("/chat")
+    @DebugLog
     public ResponseEntity<ChatResponse> chat(@RequestBody ChatRequest request) {
         long start = System.currentTimeMillis();
         try {
-            log.debug("request: {}", request);
             ChatResponse response = chatService.processMessage(request);
             if (!response.replies().isEmpty()) {
                 String reply = response.replies().getFirst();

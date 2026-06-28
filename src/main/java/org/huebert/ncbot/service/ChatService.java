@@ -10,6 +10,7 @@ import org.huebert.ncbot.entity.ChatMessage;
 import org.huebert.ncbot.handler.ChatHandler;
 import org.huebert.ncbot.repository.ChatChannelRepository;
 import org.huebert.ncbot.repository.ChatMessageRepository;
+import org.huebert.ncbot.util.DebugLog;
 import org.huebert.ncbot.util.Truncate;
 import org.springframework.stereotype.Service;
 
@@ -44,8 +45,8 @@ public class ChatService {
         Collections.sort(this.handlers);
     }
 
+    @DebugLog
     public ChatResponse processMessage(ChatRequest request) {
-        log.debug("processMessage: {}", request);
 
         if (Boolean.TRUE.equals(request.isOutgoing())) {
             log.debug("skipping outgoing message");
@@ -70,13 +71,12 @@ public class ChatService {
                             .isDm(request.isDm())
                             .memoryUpdatedAt(Instant.EPOCH)
                             .build();
-                    log.info("creating new channel: name={}, dm={}", newChannel.getChannelName(), newChannel.getIsDm());
+                    log.debug("creating new channel: name={}, dm={}", newChannel.getChannelName(), newChannel.getIsDm());
                     return chatChannelRepository.saveAndFlush(newChannel);
                 });
     }
 
     private void saveInteraction(ChatChannel chatChannel, ChatRequest request, String response) {
-        log.debug("saveInteraction: request={}, response={}", request.messageText(), response);
         chatMessageRepository.save(ChatMessage.builder()
                 .chatChannelId(chatChannel.getId())
                 .content(request.messageText())
@@ -87,7 +87,6 @@ public class ChatService {
     }
 
     private Optional<String> generateResponse(ChatChannel chatChannel, ChatRequest request) {
-        log.debug("generateResponse: chatChannel={}, request={}", chatChannel, request);
 
         // DM authorization check
         if (request.isDm()) {
@@ -105,15 +104,13 @@ public class ChatService {
         }
 
         for (ChatHandler handler : handlers) {
-            String handlerName = handler.getClass().getSimpleName();
-            log.debug("invoking handler: {}", handlerName);
             Optional<String> response = handler.handle(chatChannel, request);
             if (response.isPresent()) {
                 if (response.get().equals(ChatHandler.DO_NOT_RESPOND)) {
-                    log.debug("handler {} short-circuited the chain", handlerName);
+                    log.debug("handler {} short-circuited the chain", handler.getClass().getSimpleName());
                     return Optional.empty();
                 }
-                log.info("{} produced response for {} in {}", handlerName, request.senderName(), request.channelName());
+                log.debug("{} produced response for {} in {}", handler.getClass().getSimpleName(), request.senderName(), request.channelName());
                 return response;
             }
         }

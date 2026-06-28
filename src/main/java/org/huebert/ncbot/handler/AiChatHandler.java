@@ -14,6 +14,7 @@ import org.huebert.ncbot.repository.ChatMemory2Repository;
 import org.huebert.ncbot.repository.ChatMessageRepository;
 import org.huebert.ncbot.service.TemplateService;
 import org.huebert.ncbot.tool.WeatherTool;
+import org.huebert.ncbot.util.DebugLog;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.data.domain.PageRequest;
@@ -60,8 +61,8 @@ public class AiChatHandler implements ChatHandler {
     }
 
     @Override
+    @DebugLog
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
-        log.debug("handle: request from {} in {}", request.senderName(), request.channelName());
 
         AiMode aiMode = properties.getChannelCapabilities(request)
                 .map(ChannelCapabilities::ai)
@@ -92,15 +93,11 @@ public class AiChatHandler implements ChatHandler {
                 "request", request
         ));
 
-        long start = System.currentTimeMillis();
         String response = chatClient.prompt()
                 .system(properties.systemPrompt())
                 .user(output)
-                .messages()
                 .call()
                 .content();
-        long elapsed = System.currentTimeMillis() - start;
-        log.info("AI call completed in {} ms, response {} bytes for {} in {}", elapsed, Utf8.encodedLength(response), request.senderName(), request.channelName());
 
         if ("EMPTY".equalsIgnoreCase(Strings.trimToNull(response))) {
             log.debug("handle: AI returned empty response");
