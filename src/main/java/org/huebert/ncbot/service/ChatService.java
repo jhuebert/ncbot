@@ -46,6 +46,7 @@ public class ChatService {
         Collections.sort(this.handlers);
     }
 
+    @Transactional
     @DebugLog
     public ChatResponse processMessage(ChatRequest request) {
 
