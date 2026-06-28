@@ -9,9 +9,7 @@ import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatMemory;
 import org.huebert.ncbot.entity.ChatMessage;
-import org.huebert.ncbot.repository.ChatChannelRepository;
 import org.huebert.ncbot.repository.ChatMemory2Repository;
-import org.huebert.ncbot.repository.ChatMessageRepository;
 import org.huebert.ncbot.util.DebugLog;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
@@ -36,25 +34,25 @@ public class MemoryService {
     private final NcbotProperties ncbotProperties;
     private final ChatClient chatClient;
     private final TemplateService templateService;
-    private final ChatChannelRepository chatChannelRepository;
-    private final ChatMessageRepository chatMessageRepository;
+    private final ChannelService channelService;
+    private final MessageService messageService;
     private final ChatMemory2Repository chatMemoryRepository;
 
     public MemoryService(
             NcbotProperties ncbotProperties,
-            ChatChannelRepository chatChannelRepository,
             ChatModel chatModel,
-            ChatMessageRepository chatMessageRepository,
             ChatMemory2Repository chatMemoryRepository,
-            TemplateService templateService
+            TemplateService templateService,
+            ChannelService channelService,
+            MessageService messageService
     ) {
         this.ncbotProperties = ncbotProperties;
-        this.chatChannelRepository = chatChannelRepository;
-        this.chatMessageRepository = chatMessageRepository;
         this.chatMemoryRepository = chatMemoryRepository;
         this.templateService = templateService;
         this.chatClient = ChatClient.builder(chatModel)
                 .build();
+        this.channelService = channelService;
+        this.messageService = messageService;
     }
 
     // ── CRUD operations ──────────────────────────────────────────────
@@ -156,7 +154,7 @@ public class MemoryService {
         }
         Instant now = Instant.now();
 
-        for (ChatChannel channel : chatChannelRepository.findAll()) {
+        for (ChatChannel channel : channelService.findAll()) {
             log.debug("channel: {}", channel);
 
             if (!channel.getIsDm()) {
@@ -167,7 +165,7 @@ public class MemoryService {
                 }
             }
 
-            List<ChatMessage> messages = chatMessageRepository.findChannelMessages(channel.getId(), channel.getMemoryUpdatedAt(), now);
+            List<ChatMessage> messages = messageService.findChannelMessages(channel.getId(), channel.getMemoryUpdatedAt(), now);
             log.debug("messages count: {}", messages.size());
             if (messages.isEmpty()) {
                 continue;
@@ -177,8 +175,7 @@ public class MemoryService {
                 updateMemory(channel, partition);
             }
 
-            channel.setMemoryUpdatedAt(now);
-            chatChannelRepository.save(channel);
+            channelService.setMemoryUpdated(channel.getId());
         }
     }
 

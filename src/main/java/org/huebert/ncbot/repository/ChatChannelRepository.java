@@ -4,8 +4,10 @@ import org.huebert.ncbot.entity.ChatChannel;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
@@ -33,5 +35,13 @@ public interface ChatChannelRepository extends JpaRepository<ChatChannel, Long> 
             ORDER BY c.channelName ASC
             """)
     Page<ChatChannel> findChannelsByDm(Boolean isDm, Pageable pageable);
+
+    @Query("""
+            UPDATE ChatChannel c
+            SET c.memoryUpdatedAt = :instant
+            WHERE c.id = :id
+            """)
+    @Modifying
+    void setMemoryUpdated(Long id, Instant instance);
 
 }

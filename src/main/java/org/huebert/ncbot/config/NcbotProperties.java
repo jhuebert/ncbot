@@ -5,6 +5,7 @@ import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.util.PatternUtil;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.time.Duration;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -27,6 +28,7 @@ public record NcbotProperties(
         boolean useMemory,
         boolean condense,
         boolean allowOneBytePaths,
+        Duration memoryUpdatePeriod,
         int pathUpgradeCooldownMinutes,
         int memoryPartitionSize,
         long minimumResponseMs,

@@ -71,37 +71,37 @@ Browse entities via the custom admin API at `http://localhost:8080/v1/channels`.
 
 All configuration is via environment variables or `application.yml`:
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `NCBOT_API_KEY` | `default-key` | API key for the OpenAI-compatible endpoint |
-| `NCBOT_OPENAI_BASE_URL` | *(from application.yml)* | Base URL for the AI server |
-| `NCBOT_MODEL` | `ncbot` | Model name/identifier |
-| `NCBOT_NAME` | `ncbot` | Bot display name |
-| `NCBOT_MINIMUM_RESPONSE_MS` | `3000` | Minimum response delay in milliseconds (0 to disable) |
-| `NCBOT_MAX_REPLY_BYTES` | `128` | Max UTF-8 bytes per reply message |
-| `NCBOT_CONDENSE` | `true` | Enable AI-based response condensing when over byte limit |
-| `NCBOT_MEMORY_UPDATE_PERIOD` | `30m` | Scheduled interval for AI memory synthesis |
-| `NCBOT_MEMORY_PARTITION_SIZE` | `100` | Number of messages per memory partition |
-| `NCBOT_MAX_CHAT_HISTORY` | `25` | Number of recent messages to include in AI prompts |
-| `NCBOT_AI_ENABLED` | `true` | Master switch for AI (when false, all channels default to DISABLED) |
-| `NCBOT_AUTO_UPDATE_MEMORY` | `true` | Enable scheduled memory synthesis |
-| `NCBOT_USE_MEMORY` | `true` | Include memories in AI prompts |
-| `NCBOT_ALLOW_ONE_BYTE_PATHS` | `true` | Allow 1-byte path messages through the filter |
-| `NCBOT_PATH_UPGRADE_COOLDOWN_MINUTES` | `1440` | Cooldown between path upgrade notifications |
-| `NCBOT_CHANNELS_WELCOME` | `^#ncbot$` | Regex pattern for channels that receive welcome messages |
-| `NCBOT_CHANNELS_COMMAND` | `^#ncbot$` | Regex pattern for channels that accept commands |
-| `NCBOT_CHANNELS_PATH_UPGRADE` | `^#ncbot$` | Regex pattern for path upgrade notifications |
-| `NCBOT_CHANNELS_AI_EACH` | `^#ncbot$` | Regex pattern for channels where AI responds to every message |
-| `NCBOT_CHANNELS_AI_TAGGED` | `.*` | Regex pattern for channels where AI responds only when mentioned |
-| `NCBOT_ALLOWED_DMS` | *(empty)* | Comma-separated list of allowed DM sender hex keys |
-| `NCBOT_BLOCK_USER` | *(empty)* | Regex pattern to block users by name |
-| `NCBOT_ALLOW_USER` | *(empty)* | Regex pattern to allow users (overrides block) |
-| `NCBOT_BLOCK_PATH` | *(empty)* | Regex pattern to block paths |
-| `NCBOT_ALLOW_PATH` | *(empty)* | Regex pattern to allow paths (overrides block) |
-| `NCBOT_WELCOME_CONTENT` | *(empty)* | Custom welcome message content |
-| `NCBOT_SYSTEM_PROMPT` | *(from application.yml)* | System prompt for AI |
-| `NCBOT_CONDENSE_PROMPT` | *(from application.yml)* | Prompt for response condensing |
-| `NCBOT_MEMORY_PROMPT` | *(from application.yml)* | Prompt for memory synthesis |
+| Variable                              | Default                  | Description                                                         |
+|---------------------------------------|--------------------------|---------------------------------------------------------------------|
+| `NCBOT_API_KEY`                       | `default-key`            | API key for the OpenAI-compatible endpoint                          |
+| `NCBOT_OPENAI_BASE_URL`               | *(from application.yml)* | Base URL for the AI server                                          |
+| `NCBOT_MODEL`                         | `ncbot`                  | Model name/identifier                                               |
+| `NCBOT_NAME`                          | `ncbot`                  | Bot display name                                                    |
+| `NCBOT_MINIMUM_RESPONSE_MS`           | `3000`                   | Minimum response delay in milliseconds (0 to disable)               |
+| `NCBOT_MAX_REPLY_BYTES`               | `128`                    | Max UTF-8 bytes per reply message                                   |
+| `NCBOT_CONDENSE`                      | `true`                   | Enable AI-based response condensing when over byte limit            |
+| `NCBOT_MEMORY_UPDATE_PERIOD`          | `30m`                    | Scheduled interval for AI memory synthesis                          |
+| `NCBOT_MEMORY_PARTITION_SIZE`         | `100`                    | Number of messages per memory partition                             |
+| `NCBOT_MAX_CHAT_HISTORY`              | `25`                     | Number of recent messages to include in AI prompts                  |
+| `NCBOT_AI_ENABLED`                    | `true`                   | Master switch for AI (when false, all channels default to DISABLED) |
+| `NCBOT_AUTO_UPDATE_MEMORY`            | `true`                   | Enable scheduled memory synthesis                                   |
+| `NCBOT_USE_MEMORY`                    | `true`                   | Include memories in AI prompts                                      |
+| `NCBOT_ALLOW_ONE_BYTE_PATHS`          | `true`                   | Allow 1-byte path messages through the filter                       |
+| `NCBOT_PATH_UPGRADE_COOLDOWN_MINUTES` | `1440`                   | Cooldown between path upgrade notifications                         |
+| `NCBOT_CHANNELS_WELCOME`              | `^#ncbot$`               | Regex pattern for channels that receive welcome messages            |
+| `NCBOT_CHANNELS_COMMAND`              | `^#ncbot$`               | Regex pattern for channels that accept commands                     |
+| `NCBOT_CHANNELS_PATH_UPGRADE`         | `^#ncbot$`               | Regex pattern for path upgrade notifications                        |
+| `NCBOT_CHANNELS_AI_EACH`              | `^#ncbot$`               | Regex pattern for channels where AI responds to every message       |
+| `NCBOT_CHANNELS_AI_TAGGED`            | `.*`                     | Regex pattern for channels where AI responds only when mentioned    |
+| `NCBOT_ALLOWED_DMS`                   | *(empty)*                | Comma-separated list of allowed DM sender hex keys                  |
+| `NCBOT_BLOCK_USER`                    | *(empty)*                | Regex pattern to block users by name                                |
+| `NCBOT_ALLOW_USER`                    | *(empty)*                | Regex pattern to allow users (overrides block)                      |
+| `NCBOT_BLOCK_PATH`                    | *(empty)*                | Regex pattern to block paths                                        |
+| `NCBOT_ALLOW_PATH`                    | *(empty)*                | Regex pattern to allow paths (overrides block)                      |
+| `NCBOT_WELCOME_CONTENT`               | *(empty)*                | Custom welcome message content                                      |
+| `NCBOT_SYSTEM_PROMPT`                 | *(from application.yml)* | System prompt for AI                                                |
+| `NCBOT_CONDENSE_PROMPT`               | *(from application.yml)* | Prompt for response condensing                                      |
+| `NCBOT_MEMORY_PROMPT`                 | *(from application.yml)* | Prompt for memory synthesis                                         |
 
 ### Channel Configuration (Regex Patterns)
 

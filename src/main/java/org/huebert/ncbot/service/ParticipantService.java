@@ -2,6 +2,8 @@ package org.huebert.ncbot.service;
 
 import lombok.RequiredArgsConstructor;
 import org.huebert.ncbot.entity.ChatParticipant;
+import org.huebert.ncbot.repository.ChatMessageRepository;
+import org.huebert.ncbot.repository.ChatParticipantRepository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
@@ -13,8 +15,8 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class ParticipantService {
 
-    private final org.huebert.ncbot.repository.ChatMessageRepository messageRepository;
-    private final org.huebert.ncbot.repository.ChatParticipantRepository participantRepository;
+    private final ChatMessageRepository messageRepository;
+    private final ChatParticipantRepository participantRepository;
 
     @Transactional(readOnly = true)
     public Page<ChatParticipant> findParticipantsByChannel(Long channelId, Pageable pageable) {
@@ -26,4 +28,5 @@ public class ParticipantService {
     public Page<ChatParticipant> findAllParticipants(Pageable pageable) {
         return participantRepository.findLastSeen(pageable);
     }
+
 }

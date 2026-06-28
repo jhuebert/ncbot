@@ -81,7 +81,15 @@ public class AiChatHandler implements ChatHandler {
         }
 
         Pageable pageable = PageRequest.of(0, properties.maxChatHistory());
-        List<ChatMessage> messages = chatMessageRepository.findChannelMessages(chatChannel.getId(), chatChannel.getMemoryUpdatedAt(), Instant.now(), pageable).reversed();
+
+        Instant start = chatChannel.getMemoryUpdatedAt();
+        Instant end = Instant.now();
+        Instant startMax = end.minus(properties.memoryUpdatePeriod());
+        if (startMax.isAfter(start)) {
+            start = startMax;
+        }
+
+        List<ChatMessage> messages = chatMessageRepository.findChannelMessages(chatChannel.getId(), start, end, pageable).reversed();
         List<ChatMemory> memories = properties.useMemory()
                 ? chatMemoryRepository.findMemory(chatChannel.getId())
                 : List.of();
