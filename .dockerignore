@@ -4,4 +4,4 @@
 # Re-include the build output we need
 !build/
 !build/libs/
-!build/libs/ncbot-*.jar
+!build/libs/ncbot.jar

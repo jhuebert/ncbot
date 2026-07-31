@@ -706,7 +706,7 @@ components:
 
     MessageDto:
       type: object
-      description: A single chat message with sender and timestamp.
+      description: A single chat message with sender, timestamp, and optional bot response.
       properties:
         id:
           type: integer
@@ -726,6 +726,13 @@ components:
           format: date-time
           description: ISO-8601 timestamp when the message was created.
           example: "2026-06-03T14:30:00Z"
+        response:
+          type:
+            - string
+            - 'null'
+          description: |
+            The ncbot response text generated for this message, or `null` if the bot did not respond.
+          example: "@[alice] Hello! Welcome to the channel."
 
     MemoryDto:
       type: object
