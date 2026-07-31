@@ -35,6 +35,9 @@ def bot(**kwargs) -> str | list[str] | None:
         path: Hex-encoded routing path (nullable)
         is_outgoing: Whether this is our own outgoing message
         path_bytes_per_hop: 1, 2, or 3 (nullable)
+        packet_hash: MeshCore packet hash, first 16 hex chars of SHA256 (nullable)
+        region: Decoded region name; only meaningful when scoped is True (nullable)
+        scoped: True if message carried a regional flood scope (bool)
 
     Returns:
         None — no reply
@@ -60,6 +63,9 @@ def bot(**kwargs) -> str | list[str] | None:
         "path": kwargs.get("path"),
         "isOutgoing": kwargs.get("is_outgoing", False),
         "pathBytesPerHop": kwargs.get("path_bytes_per_hop"),
+        "packetHash": kwargs.get("packet_hash"),
+        "region": kwargs.get("region"),
+        "scoped": kwargs.get("scoped", False),
     }
 
     try:

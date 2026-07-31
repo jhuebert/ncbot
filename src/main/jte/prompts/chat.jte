@@ -23,3 +23,4 @@ __ADDITIONAL_CONTEXT__
 
 Time: ${ZonedDateTime.now().format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ssXXX"))}
 Path: ${String.join(",", request.getPathItems())}
+Region: ${(request.scoped() != null && request.scoped()) ? (request.region() != null ? request.region() : "unknown") : "none"}

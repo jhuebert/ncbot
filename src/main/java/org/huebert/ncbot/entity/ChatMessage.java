@@ -35,4 +35,13 @@ public class ChatMessage {
     @Column(name = "response")
     private String response;
 
+    @Column(name = "packet_hash")
+    private String packetHash;
+
+    @Column(name = "region")
+    private String region;
+
+    @Column(name = "scoped")
+    private Boolean scoped;
+
 }

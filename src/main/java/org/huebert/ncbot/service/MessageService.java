@@ -29,6 +29,9 @@ public class MessageService {
                 .createdAt(Instant.now())
                 .senderName(request.senderName())
                 .response(response)
+                .packetHash(request.packetHash())
+                .region(request.region())
+                .scoped(request.scoped())
                 .build());
     }
 
