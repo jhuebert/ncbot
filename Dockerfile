@@ -3,7 +3,7 @@
 FROM eclipse-temurin:25.0.3_9-jre-alpine
 WORKDIR /app
 RUN mkdir -p /data && addgroup -S ncbot && adduser -S ncbot -G ncbot && chown -R ncbot:ncbot /data
-COPY build/libs/ncbot-*.jar app.jar
+COPY build/libs/ncbot.jar app.jar
 EXPOSE 8080
 USER ncbot
 ENTRYPOINT ["java", "-jar", "app.jar", "--spring.datasource.url=jdbc:sqlite:/data/ncbot.db"]

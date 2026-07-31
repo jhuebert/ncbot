@@ -67,17 +67,17 @@ node {
 }
 
 tasks.register("npmCi", com.github.gradle.node.npm.task.NpmTask) {
-	args.set(listOf("ci"))
+	args.set(["ci"])
 	dependsOn(tasks.named("nodeSetup"))
 }
 
 tasks.register("npmBuild", com.github.gradle.node.npm.task.NpmTask) {
-	args.set(listOf("run", "build"))
+	args.set(["run", "build"])
 	dependsOn(tasks.named("npmCi"))
 }
 
 tasks.register("npmTest", com.github.gradle.node.npm.task.NpmTask) {
-	args.set(listOf("run", "test:run"))
+	args.set(["run", "test:run"])
 	dependsOn(tasks.named("npmCi"))
 }
 
@@ -88,6 +88,11 @@ tasks.register("copyFrontend", Copy) {
 }
 
 tasks.named("bootJar") {
+	archiveFileName = "ncbot.jar"
+	dependsOn(tasks.named("copyFrontend"))
+}
+
+tasks.named("processResources") {
 	dependsOn(tasks.named("copyFrontend"))
 }
 
