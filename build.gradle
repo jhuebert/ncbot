@@ -3,6 +3,7 @@ plugins {
 	id 'org.springframework.boot' version '4.1.0'
 	id 'io.spring.dependency-management' version '1.1.7'
 	id 'gg.jte.gradle' version '3.2.4'
+	id 'com.github.node-gradle.node' version '7.1.0'
 }
 
 group = 'org.huebert'
@@ -55,6 +56,50 @@ jte {
 	binaryStaticContent = true
 }
 
+// ── Frontend ──
+
+node {
+	download = true
+	version = "22.20.0"
+	workDir = file("${rootProject.projectDir}/.gradle/nodejs")
+	npmWorkDir = file("${rootProject.projectDir}/.gradle/npm")
+	nodeProjectDir = file("${rootProject.projectDir}/frontend")
+}
+
+tasks.register("npmCi", com.github.gradle.node.npm.task.NpmTask) {
+	args.set(listOf("ci"))
+	dependsOn(tasks.named("nodeSetup"))
+}
+
+tasks.register("npmBuild", com.github.gradle.node.npm.task.NpmTask) {
+	args.set(listOf("run", "build"))
+	dependsOn(tasks.named("npmCi"))
+}
+
+tasks.register("npmTest", com.github.gradle.node.npm.task.NpmTask) {
+	args.set(listOf("run", "test:run"))
+	dependsOn(tasks.named("npmCi"))
+}
+
+tasks.register("copyFrontend", Copy) {
+	dependsOn(tasks.named("npmBuild"))
+	from("${rootProject.projectDir}/frontend/dist")
+	into("${rootProject.layout.buildDirectory.get().asFile}/frontend-resources/static")
+}
+
+tasks.named("bootJar") {
+	dependsOn(tasks.named("copyFrontend"))
+}
+
+sourceSets {
+	main {
+		resources {
+			srcDir("${rootProject.layout.buildDirectory.get().asFile}/frontend-resources")
+		}
+	}
+}
+
+// Backend tests do not require Node/frontend
 tasks.named('test') {
 	useJUnitPlatform()
 }
