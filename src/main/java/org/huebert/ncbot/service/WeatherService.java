@@ -1,10 +1,12 @@
 package org.huebert.ncbot.service;
 
 import lombok.extern.slf4j.Slf4j;
+import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.WeatherApiResponse;
 import org.huebert.ncbot.util.DebugLog;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 
@@ -19,8 +21,14 @@ public class WeatherService {
 
     private final RestClient restClient;
 
-    public WeatherService() {
-        this.restClient = RestClient.create();
+    public WeatherService(NcbotProperties properties) {
+        // Bounded timeouts: a hung weather lookup must not stall the AI tool
+        // call indefinitely. Value from ncbot.weather-timeout (default 10s).
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        int timeoutMillis = (int) properties.weatherTimeout().toMillis();
+        factory.setConnectTimeout(timeoutMillis);
+        factory.setReadTimeout(timeoutMillis);
+        this.restClient = RestClient.builder().requestFactory(factory).build();
     }
 
     @DebugLog

@@ -19,10 +19,15 @@ public class WeatherTool {
     private final WeatherService weatherService;
 
     @DebugLog
-    @Tool(description = "Get current weather for a location")
+    @Tool(description = "Get current weather for a location. Temperature is in degrees "
+            + "Fahrenheit, wind speed in mph, wind direction in degrees, humidity in percent. "
+            + "Call only when the user asks about current weather and the data is not already "
+            + "fresh in the conversation (a weather claim older than ~15 minutes is stale).")
     public WeatherToolResponse getCurrentWeather(
-            @ToolParam(description = "Latitude") double latitude,
-            @ToolParam(description = "Longitude") double longitude
+            @ToolParam(description = "Latitude in decimal degrees (e.g. 40.7128). Estimate from the "
+                    + "location name if the exact value is unknown.") double latitude,
+            @ToolParam(description = "Longitude in decimal degrees (e.g. -74.0060). Estimate from "
+                    + "the location name if the exact value is unknown.") double longitude
     ) {
         return weatherService.getWeather(latitude, longitude)
                 .map(r -> WeatherToolResponse.builder()

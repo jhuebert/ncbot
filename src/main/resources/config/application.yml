@@ -25,6 +25,10 @@ spring:
       chat:
         options:
           model: ncbot
+          # Reasoning control: deepseek-v4-flash supports max|high|low (default high).
+          # "low" is the minimum supported effort and the fastest setting.
+          # ("none" is NOT a valid value for this model.)
+          reasoning-effort: low
 
 ncbot:
   name: ncbot
@@ -36,12 +40,16 @@ ncbot:
     - Always tag users using the format @[username] (e.g. @[nc1v]).
     - Do not prefix with "ncbot:" or your name.
     - Use __CHAT_MEMORY__ (key=value) as factual knowledge; never repeat keys/values in your response.
-    - Use available tools when needed.
+    - Tools: only call a tool when the user explicitly asks and the data is not already fresh in context.
+      Time-sensitive claims in older messages (weather, status, prices) are stale — each message shows
+      its age (e.g. [2h ago]); if a claim is older than ~15 minutes, call the tool for fresh data.
+      Tool calls are slow — otherwise prefer memory and conversation context. If a tool returns nothing, say so briefly.
 
     Input blocks: __CHAT_MEMORY__, __CHAT_MESSAGES__, __ADDITIONAL_CONTEXT__
     Output only the response text.
   condense-prompt: |
     Condense __RESPONSE__ to be ≤128 UTF-8 bytes.
+    Keep @[username] tags and the essential facts.
     Output only the condensed response.
   memory-prompt: |
     You are a memory synthesis engine. Convert conversation history into dense key=value pairs.
@@ -75,9 +83,12 @@ ncbot:
   allow-one-byte-paths: true
   path-upgrade-cooldown-minutes: 1440
   memory-update-period: 30m
+  ai-timeout: 10m
+  weather-timeout: 10s
   memory-partition-size: 100
-  minimum-response-ms: 3000
+  minimum-response-ms: 0
   max-reply-bytes: 128
+  max-reply-tokens: 256
   channels-welcome: "^#ncbot$"
   channels-command: "^#ncbot$"
   channels-path-upgrade: "^#ncbot$"

@@ -10,8 +10,28 @@ spring:
       chat:
         options:
           model: ncbot                    # Model identifier
+          reasoning-effort: low           # deepseek-v4-flash: max|high|low (default high); low = fastest
+          # OpenRouter-specific speed options (YAML only — env vars can't express these map keys):
+          # extra-body:
+          #   provider:
+          #     sort: throughput          # route to the fastest available provider
+          #   transforms: ["middle-out"] # ~50% fewer output tokens via middle-out compression
 
 ncbot:
+
+  # Minimum delay before replying. 0 = disabled — pacing is already handled by
+  # RemoteTerm's 2s settle delay and the bot script's 2s send spacing, so an
+  # extra floor here only adds latency. Set NCBOT_MINIMUM_RESPONSE_MS=3000 to restore.
+  minimum-response-ms: 0
+
+  # Request timeouts
+  ai-timeout: 10m            # Max time for the AI model to answer (NCBOT_AI_TIMEOUT)
+  weather-timeout: 10s       # Max time for weather tool lookups (NCBOT_WEATHER_TIMEOUT)
+
+  # Output token cap per AI round-trip on the reply path (NCBOT_MAX_REPLY_TOKENS).
+  # Replies are ≤128 bytes, so 256 is generous; it mainly bounds rambling and tool-call loops.
+  # Memory synthesis is NOT capped by this.
+  max-reply-tokens: 256
 
   channels-welcome: "#ncbot"
   channels-command: "#ncbot"

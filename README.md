@@ -77,7 +77,7 @@ All configuration is via environment variables or `application.yml`:
 | `NCBOT_OPENAI_BASE_URL`               | *(from application.yml)* | Base URL for the AI server                                          |
 | `NCBOT_MODEL`                         | `ncbot`                  | Model name/identifier                                               |
 | `NCBOT_NAME`                          | `ncbot`                  | Bot display name                                                    |
-| `NCBOT_MINIMUM_RESPONSE_MS`           | `3000`                   | Minimum response delay in milliseconds (0 to disable)               |
+| `NCBOT_MINIMUM_RESPONSE_MS`           | `0`                      | Minimum response delay in milliseconds (0 = disabled; pacing handled by RemoteTerm's settle delay + send spacing) |
 | `NCBOT_MAX_REPLY_BYTES`               | `128`                    | Max UTF-8 bytes per reply message                                   |
 | `NCBOT_CONDENSE`                      | `true`                   | Enable AI-based response condensing when over byte limit            |
 | `NCBOT_MEMORY_UPDATE_PERIOD`          | `30m`                    | Scheduled interval for AI memory synthesis                          |
@@ -99,6 +99,15 @@ All configuration is via environment variables or `application.yml`:
 | `NCBOT_BLOCK_PATH`                    | *(empty)*                | Regex pattern to block paths                                        |
 | `NCBOT_ALLOW_PATH`                    | *(empty)*                | Regex pattern to allow paths (overrides block)                      |
 | `NCBOT_WELCOME_CONTENT`               | *(empty)*                | Custom welcome message content                                      |
+| `NCBOT_TIMEOUT`                       | `1800`                   | Seconds to wait for ncbot's `/v1/chat` response (bot script)        |
+| `NCBOT_MAX_PENDING`                   | `50`                     | Max in-flight AI requests; beyond this, new messages are dropped    |
+| `RT_API_URL`                          | `http://localhost:8000/api` | RemoteTerm HTTP API base URL for delivering replies (bot script)  |
+| `RT_API_TIMEOUT`                      | `30`                     | Seconds per RemoteTerm API delivery call (bot script)               |
+| `NCBOT_MESSAGE_SPACING`               | `2.0`                    | Min seconds between bot sends (bot script; reimplements RemoteTerm's spacing) |
+| `NCBOT_AI_TIMEOUT`                    | `10m`                    | Max time for the AI model to answer (applies to the OpenAI SDK client)      |
+| `NCBOT_WEATHER_TIMEOUT`               | `10s`                    | Max time for weather tool lookups (prevents hung tool calls from stalling AI) |
+| `NCBOT_MAX_REPLY_TOKENS`               | `256`                    | Cap on output tokens per AI round-trip on the reply path (chat, tool-call args, condense). Memory synthesis is not capped |
+| `reasoning-effort` (yaml `spring.ai.openai.chat.options.reasoning-effort`) | `low` | Reasoning effort; model-dependent values (deepseek-v4-flash: `max`/`high`/`low`, default `high` — `low` is fastest; `none` is invalid for it). Env `SPRING_AI_OPENAI_CHAT_OPTIONS_REASONING_EFFORT` |
 | `NCBOT_SYSTEM_PROMPT`                 | *(from application.yml)* | System prompt for AI                                                |
 | `NCBOT_CONDENSE_PROMPT`               | *(from application.yml)* | Prompt for response condensing                                      |
 | `NCBOT_MEMORY_PROMPT`                 | *(from application.yml)* | Prompt for memory synthesis                                         |
@@ -157,17 +166,21 @@ Leave empty or unset to block all DMs. DMs always have `ai: EACH`, `welcome: tru
 
 ### Bot Script
 
-The `bot.py` file is the RemoteTerm integration script. It:
+The `bot.py` file is the RemoteTerm integration script. It runs **async fire-and-forget** so that AI latency is never limited by RemoteTerm's 10-second bot execution timeout (`BOT_EXECUTION_TIMEOUT`):
 
-1. Receives kwargs from RemoteTerm's bot system
-2. POSTs to ncbot's `/v1/chat` endpoint
-3. Returns the response (list of strings, or None)
+1. Receives kwargs from RemoteTerm's bot system and returns `None` immediately (well under the 10 s budget)
+2. In a background daemon thread, POSTs the message to ncbot's `/v1/chat` endpoint with a long timeout (default 30 min)
+3. When the reply arrives, POSTs it to RemoteTerm's *own* HTTP API (`/api/messages/direct` for DMs, `/api/messages/channel` for channels) so it goes out on the mesh
 
 Key behaviors:
 - **No reply to own messages** — skips messages where `is_outgoing` is true
-- **9-second timeout** — RemoteTerm allows 10 seconds total, leaving 1s margin
-- **Graceful failure** — returns `None` on any error (bot silently fails)
+- **Configurable AI latency ceiling** — the background thread can wait as long as needed; the only bound is ncbot's own AI client timeout, `NCBOT_AI_TIMEOUT` (default 10 min)
+- **Best-effort delivery** — replies are dropped (with a log line) if RemoteTerm's API is unreachable or RemoteTerm restarts mid-call; no retries
+- **Send spacing enforced** — reimplements RemoteTerm's 2 s `BOT_MESSAGE_SPACING` between bot sends so repeaters can return to listening mode
+- **Graceful failure** — returns `None` on any error
 - **No dependencies** — uses only Python standard library
+
+All knobs are env vars of the RemoteTerm process (see the configuration table below): `NCBOT_TIMEOUT`, `NCBOT_MAX_PENDING`, `RT_API_URL`, `RT_API_TIMEOUT`, `NCBOT_MESSAGE_SPACING`. RemoteTerm's optional HTTP Basic auth (`MESHCORE_BASIC_AUTH_USERNAME`/`MESHCORE_BASIC_AUTH_PASSWORD`) is picked up automatically.
 
 ### Bot Kwargs
 
@@ -202,7 +215,9 @@ The AI model has access to these tools:
 
 | Tool | Description |
 |------|-------------|
-| `getCurrentWeather` | Get current weather by latitude/longitude (via Open-Meteo). Returns temperature (°F), wind speed (mph), wind direction (°), humidity (%), and conditions. |
+| `getCurrentWeather` | Get current weather by latitude/longitude (via Open-Meteo). Returns temperature (°F), wind speed (mph), wind direction (°), humidity (%), and conditions. Bounded by `NCBOT_WEATHER_TIMEOUT` (default 10 s) so a hung lookup can't stall the AI call. |
+
+The tool/param descriptions tell the model to estimate coordinates from a location name and to judge freshness: chat history carries per-message ages (e.g. `[2h ago]`, rendered in `__CHAT_MESSAGES__` alongside the current `Time:` line), so a time-sensitive claim like weather older than ~15 minutes is treated as stale and triggers a fresh tool call, while fresh data avoids one.
 
 ## Admin API
 
@@ -286,9 +301,15 @@ SQLite database file lives at `/data/ncbot.db` inside the container. The `docker
 
 ### Slow Responses
 
-- Reduce `NCBOT_MINIMUM_RESPONSE_MS` (default 3000)
-- Check AI model inference speed
-- Consider a faster model or hardware acceleration
+The bot is async, so latency = RemoteTerm's 2 s settle delay + ncbot processing + mesh send. To speed up ncbot processing:
+
+- `reasoning-effort: low` is set by default (deepseek-v4-flash's fastest supported effort — the model default is `high`)
+- `NCBOT_MAX_REPLY_TOKENS` (default 256) caps output generation
+- Reduce `NCBOT_MAX_CHAT_HISTORY` (default 25) — fewer input tokens means faster prefill and lower cost (matters on OpenRouter)
+- On OpenRouter, pick a fast non-reasoning model — model choice is the single biggest speed lever
+- OpenRouter-only (YAML `extra-body`): `provider.sort: throughput` routes to the fastest provider; `transforms: ["middle-out"]` roughly halves output tokens
+- `NCBOT_AI_TIMEOUT` (default 10 min) caps how long a call may take; lower it to fail fast, but keep it generous — OpenRouter free-tier can queue
+- Each tool call adds a full extra OpenRouter round-trip; the system prompt already discourages unnecessary ones
 
 ### User Blocked Unexpectedly
 

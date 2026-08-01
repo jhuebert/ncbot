@@ -29,10 +29,13 @@ public record NcbotProperties(
         boolean condense,
         boolean allowOneBytePaths,
         Duration memoryUpdatePeriod,
+        Duration aiTimeout,
+        Duration weatherTimeout,
         int pathUpgradeCooldownMinutes,
         int memoryPartitionSize,
         long minimumResponseMs,
         int maxReplyBytes,
+        int maxReplyTokens,
 
         String channelsWelcome,
         String channelsCommand,

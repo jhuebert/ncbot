@@ -17,6 +17,7 @@ import org.huebert.ncbot.tool.WeatherTool;
 import org.huebert.ncbot.util.DebugLog;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
@@ -51,6 +52,10 @@ public class AiChatHandler implements ChatHandler {
         this.chatMessageRepository = chatMessageRepository;
         this.chatMemoryRepository = chatMemoryRepository;
         this.chatClient = ChatClient.builder(chatModel)
+                // Cap output tokens per round-trip on the reply path (chat response,
+                // tool-call arguments, and condense). Replies are ≤128 bytes, so 256
+                // is generous; the cap mainly bounds rambling and tool-call loops.
+                .defaultOptions(OpenAiChatOptions.builder().maxTokens(properties.maxReplyTokens()))
                 .defaultTools(weatherTool)
                 .build();
     }

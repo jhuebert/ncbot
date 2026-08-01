@@ -1,6 +1,7 @@
 @import org.huebert.ncbot.dto.ChatRequest
 @import org.huebert.ncbot.entity.ChatMemory
 @import org.huebert.ncbot.entity.ChatMessage
+@import org.huebert.ncbot.util.RelativeTime
 @import java.time.ZonedDateTime
 @import java.time.format.DateTimeFormatter
 @import java.util.List
@@ -15,9 +16,9 @@ ${memory.getKey()}=${memory.getValue()}@endfor
 
 __CHAT_MESSAGES__
 @for(ChatMessage msg : messages)
-${msg.getSenderName()}: ${msg.getContent()}
+@if(msg.getCreatedAt() != null)[${RelativeTime.format(msg.getCreatedAt())}] @endif${msg.getSenderName()}: ${msg.getContent()}
 @if(msg.getResponse() != null)ncbot: ${msg.getResponse()}@endif@endfor
-${request.senderName()}: ${request.messageText()}
+[just now] ${request.senderName()}: ${request.messageText()}
 
 __ADDITIONAL_CONTEXT__
 
