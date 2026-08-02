@@ -9,20 +9,28 @@ import {
   usePromoteMemory,
   useCreateChannelMemory,
   useUpdateChannelMemory,
+  useUpdateParticipantBlocked,
 } from "@/api/queries";
-import { usePageParam, useStringParam } from "@/lib/url-state";
-import { ChannelDetailTabs, type ChannelTab } from "@/components/channel-detail-tabs";
+import { usePageParam, useSearchQuery, useStringParam } from "@/lib/url-state";
+import {
+  ChannelDetailTabs,
+  type ChannelTab,
+} from "@/components/channel-detail-tabs";
 import { PageState } from "@/components/page-state";
 import { Pagination } from "@/components/pagination";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MemoryFormDialog } from "@/components/memory-form-dialog";
 import type { MemoryFormValues } from "@/components/memory-form-dialog";
-import { Button, Table, THead, Th, Td } from "@/components/ui/base";
+import { SearchInput } from "@/components/search-input";
+import { Button, Table, THead, Th, Td, Badge } from "@/components/ui/base";
 import { formatTimestamp, truncate } from "@/lib/format";
 import { clsx } from "clsx";
 import type { MessageDto, MemoryDto } from "@/api/admin";
 
 const PAGE_SIZE = 25;
+// Fewer messages per page so the chat fits on screen without an internal
+// scrollbar; the page itself scrolls only in extreme cases.
+const MESSAGE_PAGE_SIZE = 12;
 
 // ── Chat helpers ──
 
@@ -129,19 +137,25 @@ export function ChannelDetailPage() {
 
 function MessagesTab({ channelId }: { channelId: number }) {
   const [page, setPage] = usePageParam("page", 0);
-  const [sortDirection, setSortDirection] = useStringParam("sortDirection", "DESC");
+  const [sortDirection, setSortDirection] = useStringParam(
+    "sortDirection",
+    "DESC",
+  );
   const [before, setBefore] = useStringParam("before", "");
   const [after, setAfter] = useStringParam("after", "");
 
   const queryParams = {
     page,
-    size: PAGE_SIZE,
+    size: MESSAGE_PAGE_SIZE,
     sortDirection: sortDirection as "ASC" | "DESC",
     ...(before ? { before: before + ":00Z" } : {}),
     ...(after ? { after: after + ":00Z" } : {}),
   };
 
-  const { data, isLoading, error, refetch } = useChannelMessages(channelId, queryParams);
+  const { data, isLoading, error, refetch } = useChannelMessages(
+    channelId,
+    queryParams,
+  );
 
   const messages = data?.messages ?? [];
   const isEmpty = !isLoading && !error && messages.length === 0;
@@ -160,7 +174,10 @@ function MessagesTab({ channelId }: { channelId: number }) {
           Sort:
           <select
             value={sortDirection}
-            onChange={(e) => { setSortDirection(e.target.value); setPage(0); }}
+            onChange={(e) => {
+              setSortDirection(e.target.value);
+              setPage(0);
+            }}
             className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100"
             aria-label="Sort direction"
           >
@@ -173,7 +190,10 @@ function MessagesTab({ channelId }: { channelId: number }) {
           <input
             type="datetime-local"
             value={before}
-            onChange={(e) => { setBefore(e.target.value); setPage(0); }}
+            onChange={(e) => {
+              setBefore(e.target.value);
+              setPage(0);
+            }}
             className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100"
           />
         </label>
@@ -182,7 +202,10 @@ function MessagesTab({ channelId }: { channelId: number }) {
           <input
             type="datetime-local"
             value={after}
-            onChange={(e) => { setAfter(e.target.value); setPage(0); }}
+            onChange={(e) => {
+              setAfter(e.target.value);
+              setPage(0);
+            }}
             className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100"
           />
         </label>
@@ -231,7 +254,7 @@ function MessagesTab({ channelId }: { channelId: number }) {
                 >
                   <div
                     className={clsx(
-                      "max-w-[75%] whitespace-pre-wrap break-words px-3.5 py-2 text-sm leading-relaxed shadow-sm",
+                      "max-w-[75%] px-3.5 py-2 text-sm leading-relaxed break-words whitespace-pre-wrap shadow-sm",
                       isSent
                         ? "rounded-2xl rounded-br-md bg-primary-600 text-white"
                         : "rounded-2xl rounded-bl-md bg-gray-800 text-gray-100",
@@ -253,6 +276,7 @@ function MessagesTab({ channelId }: { channelId: number }) {
             currentPage={data.currentPage}
             totalPages={data.totalPages}
             totalElements={data.totalElements}
+            pageSize={MESSAGE_PAGE_SIZE}
             onPageChange={setPage}
           />
         </div>
@@ -265,12 +289,17 @@ function MessagesTab({ channelId }: { channelId: number }) {
 
 function MemoryTab({ channelId }: { channelId: number }) {
   const [page, setPage] = usePageParam("page", 0);
+  const [query, setQuery] = useSearchQuery();
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<MemoryDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MemoryDto | null>(null);
   const [promoteTarget, setPromoteTarget] = useState<MemoryDto | null>(null);
 
-  const { data, isLoading, error, refetch } = useChannelMemory(channelId, { page, size: PAGE_SIZE });
+  const { data, isLoading, error, refetch } = useChannelMemory(channelId, {
+    page,
+    size: PAGE_SIZE,
+    ...(query ? { query } : {}),
+  });
 
   const createMutation = useCreateChannelMemory(channelId);
   const updateMutation = useUpdateChannelMemory(channelId);
@@ -294,14 +323,27 @@ function MemoryTab({ channelId }: { channelId: number }) {
   return (
     <div>
       <div className="mb-4 flex items-center justify-between">
-        <h2 className="text-lg font-semibold text-gray-100">Channel Memories</h2>
-        <Button
-          size="sm"
-          onClick={() => { setEditTarget(null); setFormOpen(true); }}
-        >
-          <Plus className="h-4 w-4" />
-          Add Memory
-        </Button>
+        <h2 className="text-lg font-semibold text-gray-100">
+          Channel Memories
+        </h2>
+        <div className="flex items-center gap-2">
+          <SearchInput
+            value={query}
+            onChange={setQuery}
+            placeholder="Search key or value…"
+            ariaLabel="Search channel memories"
+          />
+          <Button
+            size="sm"
+            onClick={() => {
+              setEditTarget(null);
+              setFormOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Add Memory
+          </Button>
+        </div>
       </div>
 
       <PageState
@@ -320,9 +362,11 @@ function MemoryTab({ channelId }: { channelId: number }) {
           <tbody className="divide-y divide-gray-800">
             {memories.map((mem) => (
               <tr key={mem.id}>
-                <Td className="font-mono text-xs font-medium text-gray-100">{mem.key}</Td>
+                <Td className="font-mono text-xs font-medium text-gray-100">
+                  {mem.key}
+                </Td>
                 <Td className="max-w-md">
-                  <div className="whitespace-pre-wrap break-words text-sm text-gray-300">
+                  <div className="text-sm break-words whitespace-pre-wrap text-gray-300">
                     {truncate(mem.value, 200)}
                   </div>
                 </Td>
@@ -330,7 +374,10 @@ function MemoryTab({ channelId }: { channelId: number }) {
                   <div className="flex items-center gap-0.5">
                     <button
                       className="rounded p-1 text-gray-500 hover:bg-primary-500/10 hover:text-primary-300"
-                      onClick={() => { setEditTarget(mem); setFormOpen(true); }}
+                      onClick={() => {
+                        setEditTarget(mem);
+                        setFormOpen(true);
+                      }}
                       aria-label={`Edit memory ${mem.key}`}
                     >
                       <Edit3 className="h-3.5 w-3.5" />
@@ -369,7 +416,11 @@ function MemoryTab({ channelId }: { channelId: number }) {
       <MemoryFormDialog
         open={formOpen}
         title={editTarget ? "Edit Memory" : "Create Memory"}
-        defaultValues={editTarget ? { key: editTarget.key, value: editTarget.value } : undefined}
+        defaultValues={
+          editTarget
+            ? { key: editTarget.key, value: editTarget.value }
+            : undefined
+        }
         loading={createMutation.isPending || updateMutation.isPending}
         onSubmit={handleSubmit}
         onCancel={() => setFormOpen(false)}
@@ -384,7 +435,9 @@ function MemoryTab({ channelId }: { channelId: number }) {
         loading={deleteMutation.isPending}
         onConfirm={() => {
           if (deleteTarget) {
-            deleteMutation.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) });
+            deleteMutation.mutate(deleteTarget.id, {
+              onSuccess: () => setDeleteTarget(null),
+            });
           }
         }}
         onCancel={() => setDeleteTarget(null)}
@@ -399,7 +452,9 @@ function MemoryTab({ channelId }: { channelId: number }) {
         loading={promoteMutation.isPending}
         onConfirm={() => {
           if (promoteTarget) {
-            promoteMutation.mutate(promoteTarget.id, { onSuccess: () => setPromoteTarget(null) });
+            promoteMutation.mutate(promoteTarget.id, {
+              onSuccess: () => setPromoteTarget(null),
+            });
           }
         }}
         onCancel={() => setPromoteTarget(null)}
@@ -412,15 +467,35 @@ function MemoryTab({ channelId }: { channelId: number }) {
 
 function ParticipantsTab({ channelId }: { channelId: number }) {
   const [page, setPage] = usePageParam("page", 0);
+  const [query, setQuery] = useSearchQuery();
 
-  const { data, isLoading, error, refetch } = useChannelParticipants(channelId, { page, size: PAGE_SIZE });
+  const { data, isLoading, error, refetch } = useChannelParticipants(
+    channelId,
+    {
+      page,
+      size: PAGE_SIZE,
+      ...(query ? { query } : {}),
+    },
+  );
+
+  const updateBlocked = useUpdateParticipantBlocked();
 
   const participants = data?.content ?? [];
   const isEmpty = !isLoading && !error && participants.length === 0;
 
   return (
     <div>
-      <h2 className="mb-4 text-lg font-semibold text-gray-100">Channel Participants</h2>
+      <div className="mb-4 flex items-center justify-between">
+        <h2 className="text-lg font-semibold text-gray-100">
+          Channel Participants
+        </h2>
+        <SearchInput
+          value={query}
+          onChange={setQuery}
+          placeholder="Search name…"
+          ariaLabel="Search channel participants"
+        />
+      </div>
 
       <PageState
         isLoading={isLoading}
@@ -432,13 +507,63 @@ function ParticipantsTab({ channelId }: { channelId: number }) {
         <Table>
           <THead>
             <Th>Name</Th>
+            <Th>Status</Th>
+            <Th>First Seen</Th>
             <Th>Last Seen</Th>
+            <Th>Last Notified</Th>
+            <Th className="w-28">Actions</Th>
           </THead>
           <tbody className="divide-y divide-gray-800">
             {participants.map((p) => (
-              <tr key={p.name}>
+              <tr key={p.id}>
                 <Td className="font-medium text-gray-100">{p.name}</Td>
-                <Td className="text-xs text-gray-300">{formatTimestamp(p.lastSeen)}</Td>
+                <Td>
+                  {p.blocked ? (
+                    <Badge variant="danger">Blocked</Badge>
+                  ) : (
+                    <Badge variant="success">Active</Badge>
+                  )}
+                </Td>
+                <Td className="text-xs text-gray-500">
+                  {formatTimestamp(p.firstSeen)}
+                </Td>
+                <Td className="text-xs text-gray-300">
+                  {formatTimestamp(p.lastSeen)}
+                </Td>
+                <Td className="text-xs text-gray-500">
+                  {formatTimestamp(p.pathUpgradeNotifiedAt)}
+                </Td>
+                <Td>
+                  {p.blocked ? (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      disabled={updateBlocked.isPending}
+                      onClick={() => {
+                        updateBlocked.mutate({
+                          participantId: p.id,
+                          blocked: false,
+                        });
+                      }}
+                    >
+                      Unblock
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="danger"
+                      size="sm"
+                      disabled={updateBlocked.isPending}
+                      onClick={() => {
+                        updateBlocked.mutate({
+                          participantId: p.id,
+                          blocked: true,
+                        });
+                      }}
+                    >
+                      Block
+                    </Button>
+                  )}
+                </Td>
               </tr>
             ))}
           </tbody>

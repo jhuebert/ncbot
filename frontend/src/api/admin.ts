@@ -8,6 +8,8 @@ export interface ChannelDto {
   channelKey: string;
   channelName: string | null;
   isDm: boolean;
+  /** ISO-8601 timestamp of the most recent message, or null if the channel has none. */
+  lastMessageAt: string | null;
 }
 
 export interface MessageDto {
@@ -27,8 +29,12 @@ export interface MemoryDto {
 }
 
 export interface ParticipantDto {
+  id: number;
   name: string;
+  firstSeen: string | null;
   lastSeen: string | null;
+  pathUpgradeNotifiedAt: string | null;
+  blocked: boolean;
 }
 
 export interface PageResponse<T> {
@@ -54,6 +60,7 @@ export type MemoryUpdateRequest = components["schemas"]["MemoryUpdateRequest"];
 
 export async function fetchChannels(params?: {
   dm?: boolean;
+  query?: string;
   page?: number;
   size?: number;
 }): Promise<PageResponse<ChannelDto>> {
@@ -65,10 +72,9 @@ export async function fetchChannels(params?: {
 }
 
 export async function deleteChannel(channelId: number): Promise<void> {
-  const { error, response } = await client.DELETE(
-    "/v1/channels/{channelId}",
-    { params: { path: { channelId } } },
-  );
+  const { error, response } = await client.DELETE("/v1/channels/{channelId}", {
+    params: { path: { channelId } },
+  });
   if (error) throw await parseApiError(response);
 }
 
@@ -96,7 +102,7 @@ export async function fetchChannelMessages(
 
 export async function fetchChannelMemory(
   channelId: number,
-  params?: { page?: number; size?: number },
+  params?: { query?: string; page?: number; size?: number },
 ): Promise<PageResponse<MemoryDto>> {
   const { data, error, response } = await client.GET(
     "/v1/channels/{channelId}/memory",
@@ -158,7 +164,7 @@ export async function promoteMemory(
 
 export async function fetchChannelParticipants(
   channelId: number,
-  params?: { page?: number; size?: number },
+  params?: { query?: string; page?: number; size?: number },
 ): Promise<PageResponse<ParticipantDto>> {
   const { data, error, response } = await client.GET(
     "/v1/channels/{channelId}/participants",
@@ -171,6 +177,7 @@ export async function fetchChannelParticipants(
 // ── Global Memory ──
 
 export async function fetchGlobalMemory(params?: {
+  query?: string;
   page?: number;
   size?: number;
 }): Promise<PageResponse<MemoryDto>> {
@@ -213,6 +220,7 @@ export async function deleteGlobalMemory(id: number): Promise<void> {
 // ── Global Participants ──
 
 export async function fetchAllParticipants(params?: {
+  query?: string;
   page?: number;
   size?: number;
 }): Promise<PageResponse<ParticipantDto>> {
@@ -221,4 +229,20 @@ export async function fetchAllParticipants(params?: {
   });
   if (error) throw await parseApiError(response);
   return data as unknown as PageResponse<ParticipantDto>;
+}
+
+/**
+ * Toggles the explicit block flag on a participant. Blocked participants are
+ * ignored by the bot (unless they match an `allow-user` regex).
+ */
+export async function updateParticipantBlocked(
+  participantId: number,
+  blocked: boolean,
+): Promise<ParticipantDto> {
+  const { data, error, response } = await client.PUT(
+    "/v1/participants/{participantId}",
+    { params: { path: { participantId } }, body: { blocked } },
+  );
+  if (error) throw await parseApiError(response);
+  return data as unknown as ParticipantDto;
 }

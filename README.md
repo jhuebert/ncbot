@@ -151,6 +151,12 @@ ncbot:
 
 **Precedence:** allow always beats block. If a user/path matches an allow pattern, they are allowed regardless of block patterns.
 
+### Per-Participant Blocking
+
+In addition to the `block-user` regex, individual participants can be blocked directly via the admin API or the frontend. Each participant has a `blocked` flag (`chat_participant.blocked`) that can be toggled with `PUT /v1/participants/{participantId}` and body `{ "blocked": true | false }`. The frontend shows a Block/Unblock button on the Participants page and in each channel's Participants tab.
+
+A blocked participant behaves like a `block-user` regex match — the bot ignores their messages (an `allow-user` regex still takes precedence). Because the flag is stored in the database, it survives restarts and regex config changes.
+
 ### DM Access Control
 
 DMs are controlled via a comma-separated list of allowed sender keys:
@@ -223,7 +229,10 @@ The tool/param descriptions tell the model to estimate coordinates from a locati
 
 Custom endpoints at `/v1/*` provide read access to all entities plus full CRUD on memories. Global and channel-specific memory operations use **separate, distinct routes** (no optional channel parameters).
 
-All read endpoints support pagination via `?page=0&size=25` (0-indexed page, default 25 per page). Responses use the generic `PageResponse<T>` wrapper:
+All read endpoints support pagination via `?page=0&size=25` (0-indexed page, default 25 per page).
+The channels, memory, and participants list endpoints also accept `?query=` for a
+case-insensitive substring search (channels: name/key, memories: key/value, participants: name).
+Responses use the generic `PageResponse<T>` wrapper:
 
 ```json
 {
@@ -236,19 +245,20 @@ All read endpoints support pagination via `?page=0&size=25` (0-indexed page, def
 
 | Path | Method | Description |
 |------|--------|-------------|
-| `/v1/channels` | GET | All channels (filter: `?dm=true\|false`) — `PageResponse<ChannelDto>` |
+| `/v1/channels` | GET | All channels (filter: `?dm=true\|false`, search: `?query=`) — `PageResponse<ChannelDto>`, sorted by last message descending |
 | `/v1/channels/{channelId}/messages` | GET | Messages (`?page`, `?size`, `?before=ISO-instant`, `?after=ISO-instant`, `?sortDirection=ASC\|DESC`) — `MessagesResponse` |
-| `/v1/channels/{channelId}/memory` | GET | Channel-specific memories — `PageResponse<MemoryDto>` |
+| `/v1/channels/{channelId}/memory` | GET | Channel-specific memories (search: `?query=`) — `PageResponse<MemoryDto>` |
 | `/v1/channels/{channelId}/memory` | POST | Create channel memory (body: `{key, value}`) — `MemoryDto` |
 | `/v1/channels/{channelId}/memory/{id}` | PUT | Update channel memory (body: `{key, value}`) — validates channel match — `MemoryDto` |
 | `/v1/channels/{channelId}/memory/{id}` | DELETE | Delete channel memory — validates channel match — `204 No Content` |
 | `/v1/channels/{channelId}/memory/{id}/promote` | POST | Promote channel memory to global (deletes source) — `MemoryDto` |
-| `/v1/channels/{channelId}/participants` | GET | Participants for a channel — `PageResponse<ParticipantDto>` |
-| `/v1/memory` | GET | Global memories — `PageResponse<MemoryDto>` |
+| `/v1/channels/{channelId}/participants` | GET | Participants for a channel (search: `?query=`) — `PageResponse<ParticipantDto>` |
+| `/v1/memory` | GET | Global memories (search: `?query=`) — `PageResponse<MemoryDto>` |
 | `/v1/memory` | POST | Create global memory (body: `{key, value}`) — `MemoryDto` |
 | `/v1/memory/{id}` | PUT | Update global memory (body: `{key, value}`) — validates global scope — `MemoryDto` |
 | `/v1/memory/{id}` | DELETE | Delete global memory — validates global scope — `204 No Content` |
-| `/v1/participants` | GET | All participants with last seen — `PageResponse<ParticipantDto>` |
+| `/v1/participants` | GET | All participants with last seen (search: `?query=`) — `PageResponse<ParticipantDto>` |
+| `/v1/participants/{participantId}` | PUT | Block/unblock a participant (body: `{blocked: true\|false}`) — `ParticipantDto` |
 
 **Validation rules:**
 - Channel memory endpoints (`/v1/channels/{channelId}/memory/*`) reject requests where the memory's `chatChannelId` doesn't match the path parameter
@@ -314,6 +324,7 @@ The bot is async, so latency = RemoteTerm's 2 s settle delay + ncbot processing 
 ### User Blocked Unexpectedly
 
 - Check `block-user` — the user name may match a regex
+- Check the participant's `blocked` flag — it may have been blocked via the admin API/frontend
 - Use `allow-user` to whitelist specific users
 - Check logs for "blocked" messages
 

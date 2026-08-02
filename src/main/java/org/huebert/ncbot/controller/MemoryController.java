@@ -26,21 +26,23 @@ public class MemoryController {
     @GetMapping("/channels/{channelId}/memory")
     public PageResponse<MemoryDto> getChannelMemory(
             @PathVariable Long channelId,
+            @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "key"));
-        return PageResponse.fromPage(memoryService.findChannelMemory(channelId, pageable), MemoryDto::from);
+        return PageResponse.fromPage(memoryService.findChannelMemory(channelId, query, pageable), MemoryDto::from);
     }
 
     @DebugLog
     @GetMapping("/memory")
     public PageResponse<MemoryDto> getGlobalMemory(
+            @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "key"));
-        return PageResponse.fromPage(memoryService.findGlobalMemory(pageable), MemoryDto::from);
+        return PageResponse.fromPage(memoryService.findGlobalMemory(query, pageable), MemoryDto::from);
     }
 
     @DebugLog

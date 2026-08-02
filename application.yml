@@ -1,0 +1,29 @@
+spring:
+  ai:
+    openai:
+      api-key: default-key
+      base-url: http://10.8.0.5:11435/v1
+      chat:
+        options:
+          model: ncbot
+
+ncbot:
+  name: ncbot🌞
+  condense: false
+  welcome-content: "Info: https://www.nebraskamesh.net\nTest Channels: #omatest #lnktest"
+  allow-one-byte-paths: false
+  path-upgrade-cooldown-minutes: 360
+  channels-welcome: "^#(ncbot|oma|omatest)$"
+  channels-command: "^#(ncbot|oma|omatest)$"
+  channels-path-upgrade: "#ncbot,#oma,#omatest,Public,#test"
+  channels-ai-each: "#ncbot"
+  channels-ai-tagged: "#oma,#omatest,Public,#test"
+  channels-ai-disabled:
+  block-user-pattern: "^.*Mule.*$"
+  allow-user-pattern:
+  block-path-pattern:
+  allow-path-pattern:
+
+logging:
+  level:
+    org.huebert: DEBUG

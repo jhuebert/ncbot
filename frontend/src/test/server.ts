@@ -2,13 +2,26 @@ import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 
 export const mockChannels = [
-  { id: 1, channelKey: "#ncbot", channelName: "#ncbot", isDm: false },
-  { id: 2, channelKey: "#general", channelName: "#general", isDm: false },
+  {
+    id: 1,
+    channelKey: "#ncbot",
+    channelName: "#ncbot",
+    isDm: false,
+    lastMessageAt: "2026-06-03T14:30:00Z",
+  },
+  {
+    id: 2,
+    channelKey: "#general",
+    channelName: "#general",
+    isDm: false,
+    lastMessageAt: "2026-06-02T10:00:00Z",
+  },
   {
     id: 3,
     channelKey: "d41d8cd98f00b204e9800998ecf8427e",
     channelName: null,
     isDm: true,
+    lastMessageAt: null,
   },
 ];
 
@@ -62,9 +75,30 @@ export const mockGlobalMemories = [
 ];
 
 export const mockParticipants = [
-  { name: "alice", lastSeen: "2026-06-03T14:30:00Z" },
-  { name: "bob", lastSeen: "2026-06-03T14:29:00Z" },
-  { name: "charlie", lastSeen: "2026-06-03T12:00:00Z" },
+  {
+    id: 1,
+    name: "alice",
+    firstSeen: "2026-06-01T09:00:00Z",
+    lastSeen: "2026-06-03T14:30:00Z",
+    pathUpgradeNotifiedAt: "2026-06-02T10:00:00Z",
+    blocked: false,
+  },
+  {
+    id: 2,
+    name: "bob",
+    firstSeen: "2026-06-01T10:00:00Z",
+    lastSeen: "2026-06-03T14:29:00Z",
+    pathUpgradeNotifiedAt: null,
+    blocked: false,
+  },
+  {
+    id: 3,
+    name: "charlie",
+    firstSeen: "2026-06-01T11:00:00Z",
+    lastSeen: "2026-06-03T12:00:00Z",
+    pathUpgradeNotifiedAt: null,
+    blocked: true,
+  },
 ];
 
 function pageResponse<T>(content: T[]) {
@@ -162,6 +196,18 @@ export const handlers = [
   // Global Participants
   http.get("*/v1/participants", () => {
     return HttpResponse.json(pageResponse(mockParticipants));
+  }),
+
+  http.put("*/v1/participants/:participantId", async ({ request, params }) => {
+    const body = (await request.json()) as { blocked: boolean };
+    const participant = mockParticipants.find(
+      (p) => p.id === Number(params.participantId),
+    );
+    if (!participant) {
+      return new HttpResponse("Participant not found", { status: 400 });
+    }
+    participant.blocked = body.blocked;
+    return HttpResponse.json({ ...participant, blocked: body.blocked });
   }),
 ];
 

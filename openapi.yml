@@ -35,8 +35,10 @@ paths:
         - Channels
       summary: List all channels
       description: |
-        Returns a paginated list of all known chat channels. Optionally filter to DMs or non-DM channels.
-        Results are sorted alphabetically by `channelName`.
+        Returns a paginated list of all known chat channels. Optionally filter to DMs or non-DM channels,
+        and optionally search by case-insensitive substring match on channel name or key.
+        Results are sorted by most recent message descending (channels without messages sort last),
+        then alphabetically by `channelName`.
       operationId: listChannels
       parameters:
         - name: dm
@@ -46,6 +48,13 @@ paths:
           schema:
             type: boolean
             enum: [true, false]
+        - name: query
+          in: query
+          description: Case-insensitive substring filter on channel name or key.
+          required: false
+          schema:
+            type: string
+            example: ncbot
         - name: page
           in: query
           description: Page number (0-indexed).
@@ -76,14 +85,17 @@ paths:
                     channelKey: "#ncbot"
                     channelName: "#ncbot"
                     isDm: false
+                    lastMessageAt: "2026-06-03T14:30:00Z"
                   - id: 2
                     channelKey: "#general"
                     channelName: "#general"
                     isDm: false
+                    lastMessageAt: "2026-06-02T10:00:00Z"
                   - id: 3
                     channelKey: "d41d8cd98f00b204e9800998ecf8427e"
                     channelName: null
                     isDm: true
+                    lastMessageAt: null
                 totalPages: 1
                 currentPage: 0
                 totalElements: 3
@@ -208,7 +220,8 @@ paths:
       summary: List channel memories
       description: |
         Returns a paginated list of AI-synthesized memories scoped to the given channel.
-        Results are sorted alphabetically by `key`.
+        Results are sorted alphabetically by `key`. An optional `query` filters by
+        case-insensitive substring match on memory key or value.
       operationId: getChannelMemory
       parameters:
         - name: channelId
@@ -219,6 +232,13 @@ paths:
             type: integer
             format: int64
             example: 1
+        - name: query
+          in: query
+          description: Case-insensitive substring filter on memory key or value.
+          required: false
+          schema:
+            type: string
+            example: user.alice
         - name: page
           in: query
           required: false
@@ -429,7 +449,8 @@ paths:
       summary: List participants for a channel
       description: |
         Returns a paginated list of unique senders (participants) who have posted in the given channel.
-        Results are sorted alphabetically by sender name.
+        Results are sorted alphabetically by sender name. An optional `query` filters by
+        case-insensitive substring match on sender name.
       operationId: getChannelParticipants
       parameters:
         - name: channelId
@@ -440,6 +461,13 @@ paths:
             type: integer
             format: int64
             example: 1
+        - name: query
+          in: query
+          description: Case-insensitive substring filter on participant name.
+          required: false
+          schema:
+            type: string
+            example: ali
         - name: page
           in: query
           required: false
@@ -466,12 +494,24 @@ paths:
                 $ref: "#/components/schemas/PageResponseParticipantDto"
               example:
                 content:
-                  - name: "alice"
+                  - id: 1
+                    name: "alice"
+                    firstSeen: "2026-06-01T09:00:00Z"
                     lastSeen: null
-                  - name: "bob"
+                    pathUpgradeNotifiedAt: "2026-06-02T10:00:00Z"
+                    blocked: false
+                  - id: 2
+                    name: "bob"
+                    firstSeen: "2026-06-01T10:00:00Z"
                     lastSeen: null
-                  - name: "charlie"
+                    pathUpgradeNotifiedAt: null
+                    blocked: false
+                  - id: 3
+                    name: "charlie"
+                    firstSeen: "2026-06-01T11:00:00Z"
                     lastSeen: null
+                    pathUpgradeNotifiedAt: null
+                    blocked: true
                 totalPages: 1
                 currentPage: 0
                 totalElements: 3
@@ -486,8 +526,16 @@ paths:
       description: |
         Returns a paginated list of AI-synthesized memories with global scope
         (not tied to any channel). Results are sorted alphabetically by `key`.
+        An optional `query` filters by case-insensitive substring match on memory key or value.
       operationId: getGlobalMemory
       parameters:
+        - name: query
+          in: query
+          description: Case-insensitive substring filter on memory key or value.
+          required: false
+          schema:
+            type: string
+            example: bot.version
         - name: page
           in: query
           required: false
@@ -633,8 +681,16 @@ paths:
       description: |
         Returns a paginated list of all known participants across all channels,
         including their last seen timestamp. Results are sorted by most recently active.
+        An optional `query` filters by case-insensitive substring match on participant name.
       operationId: getAllParticipants
       parameters:
+        - name: query
+          in: query
+          description: Case-insensitive substring filter on participant name.
+          required: false
+          schema:
+            type: string
+            example: bob
         - name: page
           in: query
           required: false
@@ -661,17 +717,74 @@ paths:
                 $ref: "#/components/schemas/PageResponseParticipantDto"
               example:
                 content:
-                  - name: "alice"
+                  - id: 1
+                    name: "alice"
+                    firstSeen: "2026-06-01T09:00:00Z"
                     lastSeen: "2026-06-03T14:30:00Z"
-                  - name: "bob"
+                    pathUpgradeNotifiedAt: "2026-06-02T10:00:00Z"
+                    blocked: false
+                  - id: 2
+                    name: "bob"
+                    firstSeen: "2026-06-01T10:00:00Z"
                     lastSeen: "2026-06-03T14:29:00Z"
-                  - name: "charlie"
+                    pathUpgradeNotifiedAt: null
+                    blocked: false
+                  - id: 3
+                    name: "charlie"
+                    firstSeen: "2026-06-01T11:00:00Z"
                     lastSeen: "2026-06-03T12:00:00Z"
+                    pathUpgradeNotifiedAt: null
+                    blocked: true
                 totalPages: 1
                 currentPage: 0
                 totalElements: 3
         "400":
           description: Invalid query parameter.
+
+  /v1/participants/{participantId}:
+    put:
+      tags:
+        - Participants
+      summary: Update a participant (block/unblock)
+      description: |
+        Updates a participant's explicit block state. Blocked participants are ignored by the
+        bot, in addition to any `block-user` regex matches (an `allow-user` regex still takes
+        precedence). Returns the updated participant.
+      operationId: updateParticipant
+      parameters:
+        - name: participantId
+          in: path
+          required: true
+          description: Numeric ID of the participant to update.
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      requestBody:
+        required: true
+        description: The new block state.
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ParticipantUpdateRequest"
+            example:
+              blocked: true
+      responses:
+        "200":
+          description: Participant updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ParticipantDto"
+              example:
+                id: 1
+                name: "alice"
+                firstSeen: "2026-06-01T09:00:00Z"
+                lastSeen: "2026-06-03T14:30:00Z"
+                pathUpgradeNotifiedAt: "2026-06-02T10:00:00Z"
+                blocked: true
+        "400":
+          description: Participant not found or invalid request body.
 
 components:
   schemas:
@@ -679,7 +792,7 @@ components:
 
     ChannelDto:
       type: object
-      description: A chat channel with its identifying key and name.
+      description: A chat channel with its identifying key, name, and most recent activity.
       properties:
         id:
           type: integer
@@ -703,6 +816,15 @@ components:
           type: boolean
           description: Whether this channel is a direct message.
           example: false
+        lastMessageAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: |
+            ISO-8601 timestamp of the most recent message in the channel, or `null` if the
+            channel has no messages yet.
+          example: "2026-06-03T14:30:00Z"
 
     MessageDto:
       type: object
@@ -765,12 +887,24 @@ components:
 
     ParticipantDto:
       type: object
-      description: A chat participant (user) with their last seen timestamp.
+      description: A chat participant (user) with their timestamps, block state, and path upgrade notification state.
       properties:
+        id:
+          type: integer
+          format: int64
+          description: Unique database ID of the participant.
+          example: 1
         name:
           type: string
           description: The participant's display name.
           example: "alice"
+        firstSeen:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: ISO-8601 timestamp of when the participant was first seen.
+          example: "2026-06-01T09:00:00Z"
         lastSeen:
           type:
             - string
@@ -780,6 +914,21 @@ components:
             ISO-8601 timestamp of the participant's most recent activity.
             `null` when listing participants for a specific channel (historical senders only).
           example: "2026-06-03T14:30:00Z"
+        pathUpgradeNotifiedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: |
+            ISO-8601 timestamp of when the participant was last notified to upgrade their
+            path hash, or `null` if they have never been notified.
+          example: "2026-06-02T10:00:00Z"
+        blocked:
+          type: boolean
+          description: |
+            Whether the participant is explicitly blocked. Blocked participants are ignored by
+            the bot unless they match an `allow-user` regex.
+          example: false
 
     # ── Request DTOs ──
 
@@ -815,6 +964,17 @@ components:
           type: string
           description: Updated value for the memory.
           example: "Bob is now an active member and contributes regularly."
+
+    ParticipantUpdateRequest:
+      type: object
+      required:
+        - blocked
+      description: Request body for updating a participant's block state.
+      properties:
+        blocked:
+          type: boolean
+          description: Whether the participant should be blocked.
+          example: true
 
     # ── Response Wrappers ──
 

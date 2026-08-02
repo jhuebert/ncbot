@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.ColumnDefault;
 
 import java.time.Instant;
 
@@ -33,5 +34,10 @@ public class ChatParticipant {
 
     @Column(name = "path_upgrade_notified_at")
     private Instant pathUpgradeNotifiedAt;
+
+    @Builder.Default
+    @Column(name = "blocked", nullable = false)
+    @ColumnDefault("false")
+    private boolean blocked = false;
 
 }

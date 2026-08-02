@@ -14,6 +14,7 @@ import {
   updateGlobalMemory,
   deleteGlobalMemory,
   fetchAllParticipants,
+  updateParticipantBlocked,
 } from "./admin";
 import { toast } from "sonner";
 
@@ -22,8 +23,12 @@ import { toast } from "sonner";
 export const queryKeys = {
   channels: {
     all: ["channels"] as const,
-    list: (params?: { dm?: boolean; page?: number; size?: number }) =>
-      ["channels", "list", params] as const,
+    list: (params?: {
+      dm?: boolean;
+      query?: string;
+      page?: number;
+      size?: number;
+    }) => ["channels", "list", params] as const,
   },
   messages: {
     byChannel: (
@@ -40,23 +45,24 @@ export const queryKeys = {
   channelMemory: {
     byChannel: (
       channelId: number,
-      params?: { page?: number; size?: number },
+      params?: { query?: string; page?: number; size?: number },
     ) => ["channelMemory", channelId, params] as const,
   },
   channelParticipants: {
+    all: ["channelParticipants"] as const,
     byChannel: (
       channelId: number,
-      params?: { page?: number; size?: number },
+      params?: { query?: string; page?: number; size?: number },
     ) => ["channelParticipants", channelId, params] as const,
   },
   globalMemory: {
     all: ["globalMemory"] as const,
-    list: (params?: { page?: number; size?: number }) =>
+    list: (params?: { query?: string; page?: number; size?: number }) =>
       ["globalMemory", "list", params] as const,
   },
   participants: {
     all: ["participants"] as const,
-    list: (params?: { page?: number; size?: number }) =>
+    list: (params?: { query?: string; page?: number; size?: number }) =>
       ["participants", "list", params] as const,
   },
 };
@@ -65,6 +71,7 @@ export const queryKeys = {
 
 export function useChannels(params?: {
   dm?: boolean;
+  query?: string;
   page?: number;
   size?: number;
 }) {
@@ -110,7 +117,7 @@ export function useChannelMessages(
 
 export function useChannelMemory(
   channelId: number,
-  params?: { page?: number; size?: number },
+  params?: { query?: string; page?: number; size?: number },
 ) {
   return useQuery({
     queryKey: queryKeys.channelMemory.byChannel(channelId, params),
@@ -194,7 +201,7 @@ export function usePromoteMemory(channelId: number) {
 
 export function useChannelParticipants(
   channelId: number,
-  params?: { page?: number; size?: number },
+  params?: { query?: string; page?: number; size?: number },
 ) {
   return useQuery({
     queryKey: queryKeys.channelParticipants.byChannel(channelId, params),
@@ -205,6 +212,7 @@ export function useChannelParticipants(
 // ── Global Memory ──
 
 export function useGlobalMemory(params?: {
+  query?: string;
   page?: number;
   size?: number;
 }) {
@@ -266,11 +274,33 @@ export function useDeleteGlobalMemory() {
 // ── Participants ──
 
 export function useAllParticipants(params?: {
+  query?: string;
   page?: number;
   size?: number;
 }) {
   return useQuery({
     queryKey: queryKeys.participants.list(params),
     queryFn: () => fetchAllParticipants(params),
+  });
+}
+
+export function useUpdateParticipantBlocked() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({
+      participantId,
+      blocked,
+    }: {
+      participantId: number;
+      blocked: boolean;
+    }) => updateParticipantBlocked(participantId, blocked),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.participants.all });
+      qc.invalidateQueries({ queryKey: queryKeys.channelParticipants.all });
+      toast.success("Participant updated");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
   });
 }

@@ -2,11 +2,13 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Trash2, ChevronRight, Users, Hash } from "lucide-react";
 import { useChannels, useDeleteChannel } from "@/api/queries";
-import { useBooleanParam, usePageParam } from "@/lib/url-state";
+import { useBooleanParam, usePageParam, useSearchQuery } from "@/lib/url-state";
 import { PageState } from "@/components/page-state";
 import { Pagination } from "@/components/pagination";
 import { ConfirmDialog } from "@/components/confirm-dialog";
+import { SearchInput } from "@/components/search-input";
 import { Badge, Table, THead, Th, Td } from "@/components/ui/base";
+import { formatTimestamp, formatRelativeTime } from "@/lib/format";
 
 const PAGE_SIZE = 25;
 
@@ -14,11 +16,13 @@ export function ChannelsPage() {
   const navigate = useNavigate();
   const [page, setPage] = usePageParam("page", 0);
   const [dmFilter, setDmFilter] = useBooleanParam("dm");
+  const [query, setQuery] = useSearchQuery();
 
   const { data, isLoading, error, refetch } = useChannels({
     page,
     size: PAGE_SIZE,
     ...(dmFilter !== undefined ? { dm: dmFilter } : {}),
+    ...(query ? { query } : {}),
   });
 
   const deleteMutation = useDeleteChannel();
@@ -36,13 +40,18 @@ export function ChannelsPage() {
         <h1 className="text-2xl font-bold text-gray-100">Channels</h1>
 
         <div className="flex items-center gap-2">
+          <SearchInput
+            value={query}
+            onChange={setQuery}
+            placeholder="Search name or key…"
+            ariaLabel="Search channels"
+          />
           <span className="text-sm text-gray-500">Filter:</span>
           <select
             value={dmFilter === undefined ? "" : String(dmFilter)}
             onChange={(e) => {
               const val = e.target.value;
               setDmFilter(val === "" ? undefined : val === "true");
-              setPage(0);
             }}
             className="rounded-md border border-gray-700 bg-gray-900 px-2.5 py-1.5 text-sm text-gray-100"
             aria-label="Filter by DM status"
@@ -67,6 +76,8 @@ export function ChannelsPage() {
               <Th>Name</Th>
               <Th>Key</Th>
               <Th>Type</Th>
+              <Th>Last Message</Th>
+              <Th>Last Activity</Th>
               <Th className="w-20">Actions</Th>
             </THead>
             <tbody className="divide-y divide-gray-800">
@@ -95,6 +106,12 @@ export function ChannelsPage() {
                     <Badge variant={ch.isDm ? "default" : "success"}>
                       {ch.isDm ? "DM" : "Channel"}
                     </Badge>
+                  </Td>
+                  <Td className="text-xs whitespace-nowrap text-gray-300">
+                    {formatTimestamp(ch.lastMessageAt)}
+                  </Td>
+                  <Td className="text-xs whitespace-nowrap text-gray-500">
+                    {formatRelativeTime(ch.lastMessageAt)}
                   </Td>
                   <Td>
                     <div className="flex items-center gap-1">

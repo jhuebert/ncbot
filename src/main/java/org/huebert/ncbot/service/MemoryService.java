@@ -58,13 +58,19 @@ public class MemoryService {
     // ── CRUD operations ──────────────────────────────────────────────
 
     @Transactional(readOnly = true)
-    public Page<ChatMemory> findChannelMemory(Long channelId, Pageable pageable) {
-        return chatMemoryRepository.findChannelMemory(channelId, pageable);
+    public Page<ChatMemory> findChannelMemory(Long channelId, String query, Pageable pageable) {
+        String q = normalized(query);
+        return q == null
+                ? chatMemoryRepository.findChannelMemory(channelId, pageable)
+                : chatMemoryRepository.searchChannelMemory(channelId, q, pageable);
     }
 
     @Transactional(readOnly = true)
-    public Page<ChatMemory> findGlobalMemory(Pageable pageable) {
-        return chatMemoryRepository.findGlobalMemory(pageable);
+    public Page<ChatMemory> findGlobalMemory(String query, Pageable pageable) {
+        String q = normalized(query);
+        return q == null
+                ? chatMemoryRepository.findGlobalMemory(pageable)
+                : chatMemoryRepository.searchGlobalMemory(q, pageable);
     }
 
     @Transactional
@@ -140,6 +146,10 @@ public class MemoryService {
             throw new IllegalArgumentException("Memory is not global");
         }
         return memory;
+    }
+
+    private static String normalized(String query) {
+        return query == null ? null : query.trim();
     }
 
     // ── Scheduled memory synthesis ───────────────────────────────────

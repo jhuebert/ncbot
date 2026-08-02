@@ -40,4 +40,12 @@ public interface ChatParticipantRepository extends JpaRepository<ChatParticipant
             """)
     Page<ChatParticipant> findLastSeen(Pageable pageable);
 
+    @Query("""
+            SELECT p
+            FROM ChatParticipant p
+            WHERE LOWER(p.name) LIKE LOWER(CONCAT('%', :query, '%'))
+            ORDER BY p.lastSeen DESC
+            """)
+    Page<ChatParticipant> searchLastSeen(String query, Pageable pageable);
+
 }

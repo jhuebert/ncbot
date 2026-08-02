@@ -6,6 +6,8 @@ import org.apache.logging.log4j.util.Strings;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
+import org.huebert.ncbot.entity.ChatParticipant;
+import org.huebert.ncbot.repository.ChatParticipantRepository;
 import org.huebert.ncbot.util.DebugLog;
 import org.huebert.ncbot.util.PatternUtil;
 import org.springframework.stereotype.Component;
@@ -13,13 +15,15 @@ import org.springframework.stereotype.Component;
 import java.util.Optional;
 
 /**
- * Blocks messages from malicious users/paths based on regex allow/block lists.
+ * Blocks messages from malicious users/paths based on regex allow/block lists
+ * and per-participant block flags.
  * <p>
  * Runs before all other handlers.
  * Short-circuits the chain for blocked users/paths.
  * <p>
  * Precedence: allow always beats block. If a user/path matches an allow pattern,
- * they are allowed regardless of block patterns.
+ * they are allowed regardless of block patterns. A participant explicitly blocked
+ * via the admin API behaves like a {@code block-user} regex match.
  */
 @Slf4j
 @Component
@@ -29,6 +33,7 @@ public class BlockingChatHandler implements ChatHandler {
     private static final int ORDER = 200;
 
     private final NcbotProperties properties;
+    private final ChatParticipantRepository chatParticipantRepository;
 
     @Override
     public int getOrder() {
@@ -52,6 +57,10 @@ public class BlockingChatHandler implements ChatHandler {
         if (PatternUtil.matches(senderName, properties.allowUser())) {
             log.debug("allowed user {} (matched allow pattern {})", senderName, properties.allowUser());
             return null;
+        }
+
+        if (isBlockedParticipant(senderName)) {
+            return "participant:" + senderName;
         }
 
         if (PatternUtil.matches(senderName, properties.blockUser())) {
@@ -83,6 +92,12 @@ public class BlockingChatHandler implements ChatHandler {
 
         log.debug("user {} does not match any allow or block patterns", senderName);
         return null;
+    }
+
+    private boolean isBlockedParticipant(String senderName) {
+        return chatParticipantRepository.findParticipant(senderName)
+                .map(ChatParticipant::isBlocked)
+                .orElse(false);
     }
 
 }

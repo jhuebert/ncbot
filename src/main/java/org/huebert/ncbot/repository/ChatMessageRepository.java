@@ -39,6 +39,13 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     List<Pair<Long, Long>> findLastSeen(Set<Long> chatChannelIds);
 
     @Query("""
+            SELECT new org.huebert.ncbot.util.Pair(m.chatChannelId, MAX(m.createdAt))
+            FROM ChatMessage m
+            GROUP BY m.chatChannelId
+            """)
+    List<Pair<Long, Instant>> findLastMessageByChannel();
+
+    @Query("""
             SELECT m
             FROM ChatMessage m
             WHERE m.chatChannelId = :chatChannelId

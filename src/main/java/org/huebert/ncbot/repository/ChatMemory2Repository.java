@@ -34,6 +34,26 @@ public interface ChatMemory2Repository extends JpaRepository<ChatMemory, Long> {
             """)
     Page<ChatMemory> findGlobalMemory(Pageable pageable);
 
+    @Query("""
+            SELECT m
+            FROM ChatMemory m
+            WHERE m.chatChannelId = :chatChannelId
+              AND (LOWER(m.key) LIKE LOWER(CONCAT('%', :query, '%'))
+                   OR LOWER(m.value) LIKE LOWER(CONCAT('%', :query, '%')))
+            ORDER BY m.key ASC
+            """)
+    Page<ChatMemory> searchChannelMemory(Long chatChannelId, String query, Pageable pageable);
+
+    @Query("""
+            SELECT m
+            FROM ChatMemory m
+            WHERE m.chatChannelId IS NULL
+              AND (LOWER(m.key) LIKE LOWER(CONCAT('%', :query, '%'))
+                   OR LOWER(m.value) LIKE LOWER(CONCAT('%', :query, '%')))
+            ORDER BY m.key ASC
+            """)
+    Page<ChatMemory> searchGlobalMemory(String query, Pageable pageable);
+
     void deleteByChatChannelId(Long chatChannelId);
 
 }

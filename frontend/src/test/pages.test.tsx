@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { http, HttpResponse } from "msw";
@@ -10,46 +10,144 @@ import { GlobalMemoryPage } from "@/pages/global-memory-page";
 import { ParticipantsPage } from "@/pages/participants-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 
+// Mutable mock state so block/unblock mutations reflect on refetch.
+const participantList: {
+  id: number;
+  name: string;
+  firstSeen: string;
+  lastSeen: string;
+  pathUpgradeNotifiedAt: string | null;
+  blocked: boolean;
+}[] = [
+  {
+    id: 1,
+    name: "alice",
+    firstSeen: "2026-06-01T09:00:00Z",
+    lastSeen: "2026-06-03T14:30:00Z",
+    pathUpgradeNotifiedAt: "2026-06-02T10:00:00Z",
+    blocked: false,
+  },
+  {
+    id: 2,
+    name: "bob",
+    firstSeen: "2026-06-01T10:00:00Z",
+    lastSeen: "2026-06-03T14:29:00Z",
+    pathUpgradeNotifiedAt: null,
+    blocked: false,
+  },
+];
+
 const server = setupServer(
-  http.get("*/v1/channels", () =>
-    HttpResponse.json({
-      content: [
-        { id: 1, channelKey: "#ncbot", channelName: "#ncbot", isDm: false },
-        { id: 2, channelKey: "#general", channelName: "#general", isDm: false },
-        { id: 3, channelKey: "d41d8cd98f00b204e9800998ecf8427e", channelName: null, isDm: true },
-      ],
+  http.get("*/v1/channels", ({ request }) => {
+    const query = new URL(request.url).searchParams.get("query")?.toLowerCase();
+    const channels = [
+      {
+        id: 1,
+        channelKey: "#ncbot",
+        channelName: "#ncbot",
+        isDm: false,
+        lastMessageAt: "2026-06-03T14:30:00Z",
+      },
+      {
+        id: 2,
+        channelKey: "#general",
+        channelName: "#general",
+        isDm: false,
+        lastMessageAt: "2026-06-02T10:00:00Z",
+      },
+      {
+        id: 3,
+        channelKey: "d41d8cd98f00b204e9800998ecf8427e",
+        channelName: null,
+        isDm: true,
+        lastMessageAt: null,
+      },
+    ];
+    const content = query
+      ? channels.filter(
+          (c) =>
+            c.channelName?.toLowerCase().includes(query) ||
+            c.channelKey.toLowerCase().includes(query),
+        )
+      : channels;
+    return HttpResponse.json({
+      content,
       totalPages: 1,
       currentPage: 0,
-      totalElements: 3,
-    }),
-  ),
-  http.get("*/v1/memory", () =>
-    HttpResponse.json({
-      content: [
-        { id: 5, channelId: null, key: "bot.version", value: "Running ncbot v2.3.1" },
-      ],
+      totalElements: content.length,
+    });
+  }),
+  http.get("*/v1/memory", ({ request }) => {
+    const query = new URL(request.url).searchParams.get("query")?.toLowerCase();
+    const memories = [
+      {
+        id: 5,
+        channelId: null,
+        key: "bot.version",
+        value: "Running ncbot v2.3.1",
+      },
+    ];
+    const content = query
+      ? memories.filter(
+          (m) =>
+            m.key.toLowerCase().includes(query) ||
+            m.value.toLowerCase().includes(query),
+        )
+      : memories;
+    return HttpResponse.json({
+      content,
       totalPages: 1,
       currentPage: 0,
-      totalElements: 1,
-    }),
-  ),
-  http.get("*/v1/participants", () =>
-    HttpResponse.json({
-      content: [
-        { name: "alice", lastSeen: "2026-06-03T14:30:00Z" },
-        { name: "bob", lastSeen: "2026-06-03T14:29:00Z" },
-      ],
+      totalElements: content.length,
+    });
+  }),
+  http.get("*/v1/participants", ({ request }) => {
+    const query = new URL(request.url).searchParams.get("query")?.toLowerCase();
+    const content = query
+      ? participantList.filter((p) => p.name.toLowerCase().includes(query))
+      : participantList;
+    return HttpResponse.json({
+      content,
       totalPages: 1,
       currentPage: 0,
-      totalElements: 2,
-    }),
-  ),
+      totalElements: content.length,
+    });
+  }),
+  http.put("*/v1/participants/:participantId", async ({ request, params }) => {
+    const body = (await request.json()) as { blocked: boolean };
+    const participant = participantList.find(
+      (p) => p.id === Number(params.participantId),
+    );
+    if (participant) {
+      participant.blocked = body.blocked;
+    }
+    return HttpResponse.json(participant);
+  }),
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
 afterEach(() => {
   server.resetHandlers();
   queryClient.clear();
+  participantList.length = 0;
+  participantList.push(
+    {
+      id: 1,
+      name: "alice",
+      firstSeen: "2026-06-01T09:00:00Z",
+      lastSeen: "2026-06-03T14:30:00Z",
+      pathUpgradeNotifiedAt: "2026-06-02T10:00:00Z",
+      blocked: false,
+    },
+    {
+      id: 2,
+      name: "bob",
+      firstSeen: "2026-06-01T10:00:00Z",
+      lastSeen: "2026-06-03T14:29:00Z",
+      pathUpgradeNotifiedAt: null,
+      blocked: false,
+    },
+  );
 });
 afterAll(() => server.close());
 
@@ -79,6 +177,24 @@ describe("ChannelsPage", () => {
     renderPage(<ChannelsPage />);
     expect(await screen.findByText("DM")).toBeDefined();
   });
+
+  it("shows last message column", async () => {
+    renderPage(<ChannelsPage />);
+    expect((await screen.findAllByText("#ncbot")).length).toBeGreaterThan(0);
+    expect(screen.getByText("Last Message")).toBeDefined();
+    expect(screen.getByText("Last Activity")).toBeDefined();
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+  });
+
+  it("filters channels by search query", async () => {
+    renderPage(<ChannelsPage />);
+    expect((await screen.findAllByText("#ncbot")).length).toBeGreaterThan(0);
+    fireEvent.change(screen.getByLabelText("Search channels"), {
+      target: { value: "general" },
+    });
+    await waitFor(() => expect(screen.queryByText("#ncbot")).toBeNull());
+    expect((await screen.findAllByText("#general")).length).toBeGreaterThan(0);
+  });
 });
 
 describe("GlobalMemoryPage", () => {
@@ -90,6 +206,16 @@ describe("GlobalMemoryPage", () => {
   it("displays memories after loading", async () => {
     renderPage(<GlobalMemoryPage />);
     expect(await screen.findByText("bot.version")).toBeDefined();
+  });
+
+  it("filters memories by search query", async () => {
+    renderPage(<GlobalMemoryPage />);
+    expect(await screen.findByText("bot.version")).toBeDefined();
+    fireEvent.change(screen.getByLabelText("Search global memory"), {
+      target: { value: "nonexistent" },
+    });
+    await waitFor(() => expect(screen.queryByText("bot.version")).toBeNull());
+    expect(await screen.findByText("No global memories yet.")).toBeDefined();
   });
 });
 
@@ -103,6 +229,39 @@ describe("ParticipantsPage", () => {
     renderPage(<ParticipantsPage />);
     expect(await screen.findByText("alice")).toBeDefined();
     expect(screen.getByText("bob")).toBeDefined();
+  });
+
+  it("shows blocked status and block/unblock buttons", async () => {
+    renderPage(<ParticipantsPage />);
+    expect(await screen.findByText("alice")).toBeDefined();
+    expect(screen.getAllByText("Active").length).toBe(2);
+    const blockButtons = screen.getAllByText("Block");
+    expect(blockButtons.length).toBe(2);
+  });
+
+  it("shows first seen and last notified columns", async () => {
+    renderPage(<ParticipantsPage />);
+    expect(await screen.findByText("alice")).toBeDefined();
+    expect(screen.getByText("First Seen")).toBeDefined();
+    expect(screen.getByText("Last Notified")).toBeDefined();
+    expect(screen.getAllByText("—").length).toBeGreaterThan(0);
+  });
+
+  it("blocks a participant on click", async () => {
+    renderPage(<ParticipantsPage />);
+    const blockButtons = await screen.findAllByText("Block");
+    fireEvent.click(blockButtons[0]);
+    expect(await screen.findByText("Unblock")).toBeDefined();
+  });
+
+  it("filters participants by search query", async () => {
+    renderPage(<ParticipantsPage />);
+    expect(await screen.findByText("alice")).toBeDefined();
+    fireEvent.change(screen.getByLabelText("Search participants"), {
+      target: { value: "bob" },
+    });
+    await waitFor(() => expect(screen.queryByText("alice")).toBeNull());
+    expect(await screen.findByText("bob")).toBeDefined();
   });
 });
 

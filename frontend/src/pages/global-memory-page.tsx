@@ -6,12 +6,13 @@ import {
   useUpdateGlobalMemory,
   useDeleteGlobalMemory,
 } from "@/api/queries";
-import { usePageParam } from "@/lib/url-state";
+import { usePageParam, useSearchQuery } from "@/lib/url-state";
 import { PageState } from "@/components/page-state";
 import { Pagination } from "@/components/pagination";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MemoryFormDialog } from "@/components/memory-form-dialog";
 import type { MemoryFormValues } from "@/components/memory-form-dialog";
+import { SearchInput } from "@/components/search-input";
 import { Button, Table, THead, Th, Td } from "@/components/ui/base";
 import { truncate } from "@/lib/format";
 import type { MemoryDto } from "@/api/admin";
@@ -20,11 +21,16 @@ const PAGE_SIZE = 25;
 
 export function GlobalMemoryPage() {
   const [page, setPage] = usePageParam("page", 0);
+  const [query, setQuery] = useSearchQuery();
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<MemoryDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MemoryDto | null>(null);
 
-  const { data, isLoading, error, refetch } = useGlobalMemory({ page, size: PAGE_SIZE });
+  const { data, isLoading, error, refetch } = useGlobalMemory({
+    page,
+    size: PAGE_SIZE,
+    ...(query ? { query } : {}),
+  });
 
   const createMutation = useCreateGlobalMemory();
   const updateMutation = useUpdateGlobalMemory();
@@ -48,13 +54,24 @@ export function GlobalMemoryPage() {
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-100">Global Memory</h1>
-        <Button
-          size="sm"
-          onClick={() => { setEditTarget(null); setFormOpen(true); }}
-        >
-          <Plus className="h-4 w-4" />
-          Add Memory
-        </Button>
+        <div className="flex items-center gap-2">
+          <SearchInput
+            value={query}
+            onChange={setQuery}
+            placeholder="Search key or value…"
+            ariaLabel="Search global memory"
+          />
+          <Button
+            size="sm"
+            onClick={() => {
+              setEditTarget(null);
+              setFormOpen(true);
+            }}
+          >
+            <Plus className="h-4 w-4" />
+            Add Memory
+          </Button>
+        </div>
       </div>
 
       <div className="mt-4">
@@ -78,7 +95,7 @@ export function GlobalMemoryPage() {
                     {mem.key}
                   </Td>
                   <Td className="max-w-lg">
-                    <div className="whitespace-pre-wrap break-words text-sm text-gray-300">
+                    <div className="text-sm break-words whitespace-pre-wrap text-gray-300">
                       {truncate(mem.value, 300)}
                     </div>
                   </Td>
@@ -86,7 +103,10 @@ export function GlobalMemoryPage() {
                     <div className="flex items-center gap-0.5">
                       <button
                         className="rounded p-1 text-gray-500 hover:bg-primary-500/10 hover:text-primary-300"
-                        onClick={() => { setEditTarget(mem); setFormOpen(true); }}
+                        onClick={() => {
+                          setEditTarget(mem);
+                          setFormOpen(true);
+                        }}
                         aria-label={`Edit memory ${mem.key}`}
                       >
                         <Edit3 className="h-3.5 w-3.5" />
@@ -119,7 +139,11 @@ export function GlobalMemoryPage() {
       <MemoryFormDialog
         open={formOpen}
         title={editTarget ? "Edit Global Memory" : "Create Global Memory"}
-        defaultValues={editTarget ? { key: editTarget.key, value: editTarget.value } : undefined}
+        defaultValues={
+          editTarget
+            ? { key: editTarget.key, value: editTarget.value }
+            : undefined
+        }
         loading={createMutation.isPending || updateMutation.isPending}
         onSubmit={handleSubmit}
         onCancel={() => setFormOpen(false)}
@@ -134,7 +158,9 @@ export function GlobalMemoryPage() {
         loading={deleteMutation.isPending}
         onConfirm={() => {
           if (deleteTarget) {
-            deleteMutation.mutate(deleteTarget.id, { onSuccess: () => setDeleteTarget(null) });
+            deleteMutation.mutate(deleteTarget.id, {
+              onSuccess: () => setDeleteTarget(null),
+            });
           }
         }}
         onCancel={() => setDeleteTarget(null)}

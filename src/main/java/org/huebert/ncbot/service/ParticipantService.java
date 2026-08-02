@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -19,14 +20,40 @@ public class ParticipantService {
     private final ChatParticipantRepository participantRepository;
 
     @Transactional(readOnly = true)
-    public Page<ChatParticipant> findParticipantsByChannel(Long channelId, Pageable pageable) {
+    public Page<ChatParticipant> findParticipantsByChannel(Long channelId, String query, Pageable pageable) {
         Set<String> senders = messageRepository.findSenderNamesByChannel(channelId);
+        String q = normalized(query);
+        if (q != null) {
+            String lower = q.toLowerCase();
+            senders = senders.stream()
+                    .filter(name -> name.toLowerCase().contains(lower))
+                    .collect(Collectors.toSet());
+        }
         return participantRepository.findParticipants(senders, pageable);
     }
 
     @Transactional(readOnly = true)
-    public Page<ChatParticipant> findAllParticipants(Pageable pageable) {
-        return participantRepository.findLastSeen(pageable);
+    public Page<ChatParticipant> findAllParticipants(String query, Pageable pageable) {
+        String q = normalized(query);
+        return q == null
+                ? participantRepository.findLastSeen(pageable)
+                : participantRepository.searchLastSeen(q, pageable);
+    }
+
+    /**
+     * Sets the explicit block state of a participant. Returns the updated
+     * participant, or throws {@link IllegalArgumentException} if not found.
+     */
+    @Transactional
+    public ChatParticipant updateBlocked(Long id, boolean blocked) {
+        ChatParticipant participant = participantRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Participant not found: " + id));
+        participant.setBlocked(blocked);
+        return participantRepository.save(participant);
+    }
+
+    private static String normalized(String query) {
+        return query == null ? null : query.trim();
     }
 
 }

@@ -3,7 +3,8 @@ package org.huebert.ncbot.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.controller.dto.PageResponse;
-import org.huebert.ncbot.entity.ChatParticipant;
+import org.huebert.ncbot.controller.dto.ParticipantDto;
+import org.huebert.ncbot.controller.dto.ParticipantUpdateRequest;
 import org.huebert.ncbot.service.ParticipantService;
 import org.huebert.ncbot.util.DebugLog;
 import org.springframework.data.domain.PageRequest;
@@ -23,23 +24,34 @@ public class ParticipantsController {
 
     @DebugLog
     @GetMapping("/channels/{channelId}/participants")
-    public PageResponse<ChatParticipant> participants(
+    public PageResponse<ParticipantDto> participants(
             @PathVariable Long channelId,
+            @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "name"));
-        return PageResponse.fromPage(participantService.findParticipantsByChannel(channelId, pageable));
+        return PageResponse.fromPage(participantService.findParticipantsByChannel(channelId, query, pageable), ParticipantDto::from);
     }
 
     @DebugLog
     @GetMapping("/participants")
-    public PageResponse<ChatParticipant> allParticipants(
+    public PageResponse<ParticipantDto> allParticipants(
+            @RequestParam(required = false) String query,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size
     ) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "name"));
-        return PageResponse.fromPage(participantService.findAllParticipants(pageable));
+        return PageResponse.fromPage(participantService.findAllParticipants(query, pageable), ParticipantDto::from);
+    }
+
+    @DebugLog
+    @PutMapping("/participants/{participantId}")
+    public ParticipantDto updateParticipant(
+            @PathVariable Long participantId,
+            @RequestBody ParticipantUpdateRequest request
+    ) {
+        return ParticipantDto.from(participantService.updateBlocked(participantId, request.blocked()));
     }
 
 }

@@ -34,6 +34,14 @@ public interface ChatChannelRepository extends JpaRepository<ChatChannel, Long> 
             WHERE c.isDm = :isDm
             ORDER BY c.channelName ASC
             """)
+    List<ChatChannel> findChannelsByDm(Boolean isDm);
+
+    @Query("""
+            SELECT c
+            FROM ChatChannel c
+            WHERE c.isDm = :isDm
+            ORDER BY c.channelName ASC
+            """)
     Page<ChatChannel> findChannelsByDm(Boolean isDm, Pageable pageable);
 
     @Query("""

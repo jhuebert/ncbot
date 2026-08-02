@@ -13,8 +13,10 @@ export interface paths {
         };
         /**
          * List all channels
-         * @description Returns a paginated list of all known chat channels. Optionally filter to DMs or non-DM channels.
-         *     Results are sorted alphabetically by `channelName`.
+         * @description Returns a paginated list of all known chat channels. Optionally filter to DMs or non-DM channels,
+         *     and optionally search by case-insensitive substring match on channel name or key.
+         *     Results are sorted by most recent message descending (channels without messages sort last),
+         *     then alphabetically by `channelName`.
          */
         get: operations["listChannels"];
         put?: never;
@@ -77,7 +79,8 @@ export interface paths {
         /**
          * List channel memories
          * @description Returns a paginated list of AI-synthesized memories scoped to the given channel.
-         *     Results are sorted alphabetically by `key`.
+         *     Results are sorted alphabetically by `key`. An optional `query` filters by
+         *     case-insensitive substring match on memory key or value.
          */
         get: operations["getChannelMemory"];
         put?: never;
@@ -150,7 +153,8 @@ export interface paths {
         /**
          * List participants for a channel
          * @description Returns a paginated list of unique senders (participants) who have posted in the given channel.
-         *     Results are sorted alphabetically by sender name.
+         *     Results are sorted alphabetically by sender name. An optional `query` filters by
+         *     case-insensitive substring match on sender name.
          */
         get: operations["getChannelParticipants"];
         put?: never;
@@ -172,6 +176,7 @@ export interface paths {
          * List global memories
          * @description Returns a paginated list of AI-synthesized memories with global scope
          *     (not tied to any channel). Results are sorted alphabetically by `key`.
+         *     An optional `query` filters by case-insensitive substring match on memory key or value.
          */
         get: operations["getGlobalMemory"];
         put?: never;
@@ -224,9 +229,32 @@ export interface paths {
          * List all participants with last seen
          * @description Returns a paginated list of all known participants across all channels,
          *     including their last seen timestamp. Results are sorted by most recently active.
+         *     An optional `query` filters by case-insensitive substring match on participant name.
          */
         get: operations["getAllParticipants"];
         put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/participants/{participantId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update a participant (block/unblock)
+         * @description Updates a participant's explicit block state. Blocked participants are ignored by the
+         *     bot, in addition to any `block-user` regex matches (an `allow-user` regex still takes
+         *     precedence). Returns the updated participant.
+         */
+        put: operations["updateParticipant"];
         post?: never;
         delete?: never;
         options?: never;
@@ -238,7 +266,7 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** @description A chat channel with its identifying key and name. */
+        /** @description A chat channel with its identifying key, name, and most recent activity. */
         ChannelDto: {
             /**
              * Format: int64
@@ -262,6 +290,13 @@ export interface components {
              * @example false
              */
             isDm?: boolean;
+            /**
+             * Format: date-time
+             * @description ISO-8601 timestamp of the most recent message in the channel, or `null` if the
+             *     channel has no messages yet.
+             * @example 2026-06-03T14:30:00Z
+             */
+            lastMessageAt?: string | null;
         };
         /** @description A single chat message with sender, timestamp, and optional bot response. */
         MessageDto: {
@@ -321,8 +356,14 @@ export interface components {
              */
             value?: string;
         };
-        /** @description A chat participant (user) with their last seen timestamp. */
+        /** @description A chat participant (user) with their timestamps, block state, and path upgrade notification state. */
         ParticipantDto: {
+            /**
+             * Format: int64
+             * @description Unique database ID of the participant.
+             * @example 1
+             */
+            id?: number;
             /**
              * @description The participant's display name.
              * @example alice
@@ -330,11 +371,30 @@ export interface components {
             name?: string;
             /**
              * Format: date-time
+             * @description ISO-8601 timestamp of when the participant was first seen.
+             * @example 2026-06-01T09:00:00Z
+             */
+            firstSeen?: string | null;
+            /**
+             * Format: date-time
              * @description ISO-8601 timestamp of the participant's most recent activity.
              *     `null` when listing participants for a specific channel (historical senders only).
              * @example 2026-06-03T14:30:00Z
              */
             lastSeen?: string | null;
+            /**
+             * Format: date-time
+             * @description ISO-8601 timestamp of when the participant was last notified to upgrade their
+             *     path hash, or `null` if they have never been notified.
+             * @example 2026-06-02T10:00:00Z
+             */
+            pathUpgradeNotifiedAt?: string | null;
+            /**
+             * @description Whether the participant is explicitly blocked. Blocked participants are ignored by
+             *     the bot unless they match an `allow-user` regex.
+             * @example false
+             */
+            blocked?: boolean;
         };
         /** @description Request body for creating a new memory. */
         MemoryCreateRequest: {
@@ -361,6 +421,14 @@ export interface components {
              * @example Bob is now an active member and contributes regularly.
              */
             value: string;
+        };
+        /** @description Request body for updating a participant's block state. */
+        ParticipantUpdateRequest: {
+            /**
+             * @description Whether the participant should be blocked.
+             * @example true
+             */
+            blocked: boolean;
         };
         /** @description Paginated message list for a specific channel, including channel metadata. */
         MessagesResponse: {
@@ -441,6 +509,8 @@ export interface operations {
             query?: {
                 /** @description Filter by direct message status. Omit to return all channels. */
                 dm?: true | false;
+                /** @description Case-insensitive substring filter on channel name or key. */
+                query?: string;
                 /** @description Page number (0-indexed). */
                 page?: number;
                 /** @description Number of items per page. */
@@ -465,19 +535,22 @@ export interface operations {
                      *           "id": 1,
                      *           "channelKey": "#ncbot",
                      *           "channelName": "#ncbot",
-                     *           "isDm": false
+                     *           "isDm": false,
+                     *           "lastMessageAt": "2026-06-03T14:30:00Z"
                      *         },
                      *         {
                      *           "id": 2,
                      *           "channelKey": "#general",
                      *           "channelName": "#general",
-                     *           "isDm": false
+                     *           "isDm": false,
+                     *           "lastMessageAt": "2026-06-02T10:00:00Z"
                      *         },
                      *         {
                      *           "id": 3,
                      *           "channelKey": "d41d8cd98f00b204e9800998ecf8427e",
                      *           "channelName": null,
-                     *           "isDm": true
+                     *           "isDm": true,
+                     *           "lastMessageAt": null
                      *         }
                      *       ],
                      *       "totalPages": 1,
@@ -598,6 +671,8 @@ export interface operations {
     getChannelMemory: {
         parameters: {
             query?: {
+                /** @description Case-insensitive substring filter on memory key or value. */
+                query?: string;
                 /** @description Page number (0-indexed). */
                 page?: number;
                 /** @description Number of items per page. */
@@ -824,6 +899,8 @@ export interface operations {
     getChannelParticipants: {
         parameters: {
             query?: {
+                /** @description Case-insensitive substring filter on participant name. */
+                query?: string;
                 /** @description Page number (0-indexed). */
                 page?: number;
                 /** @description Number of items per page. */
@@ -848,16 +925,28 @@ export interface operations {
                      * @example {
                      *       "content": [
                      *         {
+                     *           "id": 1,
                      *           "name": "alice",
-                     *           "lastSeen": null
+                     *           "firstSeen": "2026-06-01T09:00:00Z",
+                     *           "lastSeen": null,
+                     *           "pathUpgradeNotifiedAt": "2026-06-02T10:00:00Z",
+                     *           "blocked": false
                      *         },
                      *         {
+                     *           "id": 2,
                      *           "name": "bob",
-                     *           "lastSeen": null
+                     *           "firstSeen": "2026-06-01T10:00:00Z",
+                     *           "lastSeen": null,
+                     *           "pathUpgradeNotifiedAt": null,
+                     *           "blocked": false
                      *         },
                      *         {
+                     *           "id": 3,
                      *           "name": "charlie",
-                     *           "lastSeen": null
+                     *           "firstSeen": "2026-06-01T11:00:00Z",
+                     *           "lastSeen": null,
+                     *           "pathUpgradeNotifiedAt": null,
+                     *           "blocked": true
                      *         }
                      *       ],
                      *       "totalPages": 1,
@@ -880,6 +969,8 @@ export interface operations {
     getGlobalMemory: {
         parameters: {
             query?: {
+                /** @description Case-insensitive substring filter on memory key or value. */
+                query?: string;
                 /** @description Page number (0-indexed). */
                 page?: number;
                 /** @description Number of items per page. */
@@ -1056,6 +1147,8 @@ export interface operations {
     getAllParticipants: {
         parameters: {
             query?: {
+                /** @description Case-insensitive substring filter on participant name. */
+                query?: string;
                 /** @description Page number (0-indexed). */
                 page?: number;
                 /** @description Number of items per page. */
@@ -1077,16 +1170,28 @@ export interface operations {
                      * @example {
                      *       "content": [
                      *         {
+                     *           "id": 1,
                      *           "name": "alice",
-                     *           "lastSeen": "2026-06-03T14:30:00Z"
+                     *           "firstSeen": "2026-06-01T09:00:00Z",
+                     *           "lastSeen": "2026-06-03T14:30:00Z",
+                     *           "pathUpgradeNotifiedAt": "2026-06-02T10:00:00Z",
+                     *           "blocked": false
                      *         },
                      *         {
+                     *           "id": 2,
                      *           "name": "bob",
-                     *           "lastSeen": "2026-06-03T14:29:00Z"
+                     *           "firstSeen": "2026-06-01T10:00:00Z",
+                     *           "lastSeen": "2026-06-03T14:29:00Z",
+                     *           "pathUpgradeNotifiedAt": null,
+                     *           "blocked": false
                      *         },
                      *         {
+                     *           "id": 3,
                      *           "name": "charlie",
-                     *           "lastSeen": "2026-06-03T12:00:00Z"
+                     *           "firstSeen": "2026-06-01T11:00:00Z",
+                     *           "lastSeen": "2026-06-03T12:00:00Z",
+                     *           "pathUpgradeNotifiedAt": null,
+                     *           "blocked": true
                      *         }
                      *       ],
                      *       "totalPages": 1,
@@ -1098,6 +1203,56 @@ export interface operations {
                 };
             };
             /** @description Invalid query parameter. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    updateParticipant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Numeric ID of the participant to update. */
+                participantId: number;
+            };
+            cookie?: never;
+        };
+        /** @description The new block state. */
+        requestBody: {
+            content: {
+                /**
+                 * @example {
+                 *       "blocked": true
+                 *     }
+                 */
+                "application/json": components["schemas"]["ParticipantUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description Participant updated successfully. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "id": 1,
+                     *       "name": "alice",
+                     *       "firstSeen": "2026-06-01T09:00:00Z",
+                     *       "lastSeen": "2026-06-03T14:30:00Z",
+                     *       "pathUpgradeNotifiedAt": "2026-06-02T10:00:00Z",
+                     *       "blocked": true
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ParticipantDto"];
+                };
+            };
+            /** @description Participant not found or invalid request body. */
             400: {
                 headers: {
                     [name: string]: unknown;

@@ -1,0 +1,86 @@
+# ── ncbot + RemoteTerm stack ──────────────────────────────────────────────
+# Copy this into your deployment (e.g. docker-compose.yml) and adjust .env vars.
+#
+# Changes vs your previous compose:
+#   1. remoteterm now sets NCBOT_URL → http://ncbot:8080/v1/chat
+#      (the bot script runs INSIDE RemoteTerm; the default localhost:8080
+#      cannot reach the ncbot container — this is likely why the bot
+#      silently fails today). RT_API_URL needs no change (localhost:8000
+#      is RemoteTerm's own API, in the same container).
+#   2. Removed the invalid reasoning_effort="none" env and the broken
+#      extra-body variant. deepseek-v4-flash only supports max|high|low
+#      (default high); "none" would 400. Set to "low" = fastest valid.
+#   3. Added depends_on + explicit response-pacing knobs.
+
+services:
+  remoteterm:
+    image: docker.io/jkingsman/remoteterm-meshcore:latest
+    ports:
+      - 9005:8000
+    volumes:
+      - ${STACK_HOME}/data:/app/data
+    environment:
+      MESHCORE_DATABASE_PATH: data/meshcore.db
+      MESHCORE_TCP_HOST: ${MC_HOST}
+      MESHCORE_TCP_PORT: 5000
+      MESHCORE_BASIC_AUTH_USERNAME: ${RT_USERNAME}
+      MESHCORE_BASIC_AUTH_PASSWORD: ${RT_PASSWORD}
+
+      # ── ncbot bot script (executes inside RemoteTerm) ──────────────
+      NCBOT_URL: http://ncbot:8080/v1/chat   # reach ncbot over the compose network
+      # NCBOT_TIMEOUT: "1800"                # s to wait for ncbot (default 30 min)
+      # NCBOT_MAX_PENDING: "50"              # max in-flight AI requests (drop beyond)
+      # NCBOT_MESSAGE_SPACING: "2.0"         # min s between bot sends
+      # RT_API_URL: http://localhost:8000/api # RemoteTerm's own API (default OK)
+    depends_on:
+      - ncbot
+    restart: unless-stopped
+
+  ncbot:
+    image: jhuebert/ncbot:1   # ⚠ rebuild/push this image so jar defaults apply
+    container_name: ncbot
+    restart: unless-stopped
+    environment:
+      TZ: America/Chicago
+      LOGGING_LEVEL_ORG_HUEBERT: DEBUG
+      SPRING_AI_OPENAI_API_KEY: ${NCBOT_AI_API_KEY}
+      SPRING_AI_OPENAI_BASE_URL: ${NCBOT_AI_URL}   # e.g. https://openrouter.ai/api/v1
+      SPRING_AI_OPENAI_CHAT_OPTIONS_MODEL: ${NCBOT_AI_MODEL}  # e.g. deepseek/deepseek-v4-flash
+      # deepseek-v4-flash supports max|high|low (default high); low = fastest valid.
+      # "none" is NOT valid for this model (400s). Jar default is now low too.
+      SPRING_AI_OPENAI_CHAT_OPTIONS_REASONING_EFFORT: "low"
+      # Explicit reply pacing (matches jar defaults; set so old images behave too):
+      NCBOT_MINIMUM_RESPONSE_MS: "0"         # no artificial delay (RemoteTerm settles + spaces)
+      # Optional tuning (jar defaults shown):
+      # NCBOT_AI_TIMEOUT: "10m"              # max time for the AI model to answer
+      # NCBOT_WEATHER_TIMEOUT: "10s"         # max time for weather tool lookups
+      # NCBOT_MAX_REPLY_TOKENS: "256"        # token cap per AI round-trip (reply path)
+      NCBOT_AI_ENABLED: ${AI_ENABLED}
+      NCBOT_AUTO_UPDATE_MEMORY: false
+      NCBOT_WELCOME_CONTENT: |-
+        https://www.nebraskamesh.net
+        Test: #omatest #lnktest #ncbot
+      NCBOT_CONDENSE: "false"
+      NCBOT_ALLOW_ONE_BYTE_PATHS: "true"
+      NCBOT_PATH_UPGRADE_COOLDOWN_MINUTES: 10080
+      NCBOT_CHANNELS_WELCOME: "^#(ncbot|oma|omatest|bellevue|icltest|bot)$"
+      NCBOT_CHANNELS_COMMAND: "^#(ncbot|oma|omatest|bellevue|icltest|bot)$"
+      NCBOT_CHANNELS_PATH_UPGRADE: ".*"
+      NCBOT_CHANNELS_AI_TAGGED: ".*"
+      NCBOT_BLOCK_USER: "^(.*ncbot.*|NMB|OBot|ThirstyBot|.*Mule.*|.*Super-X.*|.*🐴.*|.*Rocinante.*)$"
+      NCBOT_BLOCK_CHANNEL: "^#wardriving$"
+    ports:
+      - 9007:8080
+    volumes:
+      - ${STACK_HOME}/ncbot/ncbot.db:/data/ncbot.db
+    healthcheck:
+      test:
+        - CMD
+        - wget
+        - --spider
+        - -q
+        - http://localhost:8080/actuator/health
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

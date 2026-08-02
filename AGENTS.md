@@ -27,6 +27,7 @@ org.huebert.ncbot/
 │   ├── ChannelCapabilities        # Resolved channel capabilities
 │   └── NcbotProperties
 ├── controller/                    # HTTP endpoints (thin — delegates to services)
+│   ├── ApiExceptionHandler         # IllegalArgumentException → HTTP 400
 │   ├── ChatController             # POST /v1/chat
 │   ├── ChannelsController         # /v1/channels CRUD
 │   ├── MessagesController         # /v1/channels/{id}/messages
@@ -62,7 +63,7 @@ org.huebert.ncbot/
 ├── controller/dto/                # API response DTOs (records)
 │   ├── ChannelDto, MessageDto, MessagesResponse
 │   ├── MemoryDto, MemoryCreateRequest, MemoryUpdateRequest
-│   ├── ParticipantDto, PageResponse
+│   ├── ParticipantDto, ParticipantUpdateRequest, PageResponse
 ├── dto/                           # Request/response DTOs (records)
 │   ├── ChatRequest, ChatResponse
 │   ├── WeatherApiResponse, WeatherCurrent, WeatherToolResponse
@@ -80,7 +81,7 @@ Handlers implement `ChatHandler` with `getOrder()` — **larger values run first
 
 | Handler | Order | Purpose |
 |---|---|---|
-| `BlockingChatHandler` | 200 | Block user/path/channel by regex |
+| `BlockingChatHandler` | 200 | Block user/path/channel by regex or explicit participant flag |
 | `WelcomeChatHandler` | 100 | Greet new participants |
 | `PathUpgradeChatHandler` | 75 | Notify users to upgrade path hash |
 | `PathFilterChatHandler` | 60 | Conditionally block 1-byte paths (`NCBOT_ALLOW_ONE_BYTE_PATHS`) |
@@ -136,6 +137,15 @@ ncbot:
 
 **DMs:** Channel blocking is skipped for DMs — only user and path patterns apply.
 
+### Per-Participant Blocking
+
+In addition to the `block-user` regex, individual participants can be blocked directly via the admin API and frontend. Each participant row has a `blocked` boolean flag (`chat_participant.blocked`):
+
+- `PUT /v1/participants/{participantId}` with body `{ "blocked": true }` blocks a participant; `{ "blocked": false }` unblocks
+- The frontend (Participants page and channel detail → Participants tab) shows a Block/Unblock button per participant
+- A blocked participant behaves like a `block-user` regex match — the bot ignores their messages, and `allow-user` regex still takes precedence
+- The flag is stored in the database, so it survives restarts (unlike regex config)
+
 ### Path Filtering
 
 1-byte paths are **allowed by default** (`NCBOT_ALLOW_ONE_BYTE_PATHS=true`). Set to `false` to block 1-byte paths from reaching command and AI handlers. Welcome and path-upgrade notifications still work for blocked paths.
@@ -176,6 +186,14 @@ Controllers live in `controller/` package. See `openapi.yml` for the full OpenAP
 
 **Pagination is 0-indexed** — use `?page=0&size=25` (default page 0, default size 25). All paginated endpoints return `PageResponse<T>`:
 
+**Search** — the channels, memory, and participants list endpoints accept an optional `?query=` param for a case-insensitive substring search:
+
+| Endpoint | Search matches |
+|---|---|
+| `GET /v1/channels` | channel name or key |
+| `GET /v1/memory`, `GET /v1/channels/{id}/memory` | memory key or value |
+| `GET /v1/participants`, `GET /v1/channels/{id}/participants` | participant name |
+
 ```json
 {
   "content": [...],
@@ -187,16 +205,17 @@ Controllers live in `controller/` package. See `openapi.yml` for the full OpenAP
 
 | Path | Method | Description |
 |---|---|---|
-| `/v1/channels` | GET | All channels (`?dm=true\|false`) |
+| `/v1/channels` | GET | All channels (`?dm=true\|false`, `?query=`), sorted by last message DESC |
 | `/v1/channels/{channelId}` | DELETE | Delete channel + cascade |
 | `/v1/channels/{channelId}/messages` | GET | Messages (`?page`, `?size`, `?before=ISO-instant`, `?after=ISO-instant`, `?sortDirection=ASC\|DESC`) |
-| `/v1/channels/{channelId}/memory` | GET/POST | Channel memories |
+| `/v1/channels/{channelId}/memory` | GET/POST | Channel memories (GET supports `?query=`) |
 | `/v1/channels/{channelId}/memory/{id}` | PUT/DELETE | Update/delete channel memory |
 | `/v1/channels/{channelId}/memory/{id}/promote` | POST | Promote to global |
-| `/v1/channels/{channelId}/participants` | GET | Channel participants |
-| `/v1/memory` | GET/POST | Global memories |
+| `/v1/channels/{channelId}/participants` | GET | Channel participants (`?query=`) |
+| `/v1/memory` | GET/POST | Global memories (GET supports `?query=`) |
 | `/v1/memory/{id}` | PUT/DELETE | Update/delete global memory |
-| `/v1/participants` | GET | All participants with last seen |
+| `/v1/participants` | GET | All participants with last seen (`?query=`) |
+| `/v1/participants/{participantId}` | PUT | Block/unblock participant (body: `{blocked: true\|false}`) — `ParticipantDto` |
 
 **Validation rules:**
 - Channel memory endpoints reject where memory's `chatChannelId` ≠ path parameter
@@ -209,16 +228,17 @@ Controllers live in `controller/` package. See `openapi.yml` for the full OpenAP
 |---|---|
 | `MemoryCreateRequest` | `key`, `value` |
 | `MemoryUpdateRequest` | `key`, `value` |
+| `ParticipantUpdateRequest` | `blocked` |
 
 **Response DTOs** (all in `controller.dto` package):
 
 | DTO | Fields |
 |---|---|
-| `ChannelDto` | `id`, `channelKey`, `channelName`, `isDm` |
+| `ChannelDto` | `id`, `channelKey`, `channelName`, `isDm`, `lastMessageAt` |
 | `MessageDto` | `id`, `senderName`, `content`, `createdAt` |
 | `MessagesResponse` | `channelId`, `channelName`, `messages[]`, `totalPages`, `currentPage`, `totalElements` |
 | `MemoryDto` | `id`, `channelId`, `key`, `value` |
-| `ParticipantDto` | `name`, `lastSeen` |
+| `ParticipantDto` | `id`, `name`, `firstSeen`, `lastSeen`, `pathUpgradeNotifiedAt`, `blocked` |
 | `PageResponse<T>` | `content[]`, `totalPages`, `currentPage`, `totalElements` |
 
 ---
@@ -296,7 +316,7 @@ Controllers live in `controller/` package. See `openapi.yml` for the full OpenAP
 | Responses too long | Condensing disabled or limit too high | Enable condensing or reduce `NCBOT_MAX_REPLY_BYTES` |
 | Slow responses | High `NCBOT_MINIMUM_RESPONSE_MS` or slow model | Reduce delay or use faster model |
 | Template errors | jte compile failure | Check `src/main/jte/` syntax; run `./gradlew build` |
-| User blocked unexpectedly | Regex in `block-user` matches | Check patterns; use `allow-user` to whitelist |
+| User blocked unexpectedly | Regex in `block-user` matches, or participant `blocked` flag is set | Check patterns; use `allow-user` to whitelist, or unblock via admin API/frontend |
 | 1-byte path messages not responding | `NCBOT_ALLOW_ONE_BYTE_PATHS=false` or path is 1-byte | Check setting; set to `true` to allow, or handler order is correct |
 
 **Check logs:** `docker compose logs ncbot` or `./gradlew bootRun`

@@ -5,6 +5,7 @@ interface PaginationProps {
   currentPage?: number;
   totalPages?: number;
   totalElements?: number;
+  pageSize?: number;
   onPageChange: (page: number) => void;
 }
 
@@ -12,12 +13,13 @@ export function Pagination({
   currentPage = 0,
   totalPages = 0,
   totalElements = 0,
+  pageSize = 25,
   onPageChange,
 }: PaginationProps) {
   if (totalPages <= 1) return null;
 
-  const start = currentPage * 25 + 1;
-  const end = Math.min((currentPage + 1) * 25, totalElements);
+  const start = currentPage * pageSize + 1;
+  const end = Math.min((currentPage + 1) * pageSize, totalElements);
 
   return (
     <nav
