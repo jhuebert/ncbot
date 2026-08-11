@@ -11,6 +11,8 @@ public record WeatherApiResponse(
         @JsonProperty("timezone_abbreviation") String timezoneAbbreviation,
         @JsonProperty("elevation") Double elevation,
         @JsonProperty("current_units") WeatherCurrentUnits currentUnits,
-        @JsonProperty("current") WeatherCurrent current
+        @JsonProperty("current") WeatherCurrent current,
+        @JsonProperty("daily_units") WeatherDailyUnits dailyUnits,
+        @JsonProperty("daily") WeatherDaily daily
 ) {
 }
