@@ -15,6 +15,9 @@ import {
   deleteGlobalMemory,
   fetchAllParticipants,
   updateParticipantBlocked,
+  fetchConfigItems,
+  updateConfigItem,
+  resetConfigItem,
 } from "./admin";
 import { toast } from "sonner";
 
@@ -64,6 +67,9 @@ export const queryKeys = {
     all: ["participants"] as const,
     list: (params?: { query?: string; page?: number; size?: number }) =>
       ["participants", "list", params] as const,
+  },
+  config: {
+    all: ["config"] as const,
   },
 };
 
@@ -298,6 +304,44 @@ export function useUpdateParticipantBlocked() {
       qc.invalidateQueries({ queryKey: queryKeys.participants.all });
       qc.invalidateQueries({ queryKey: queryKeys.channelParticipants.all });
       toast.success("Participant updated");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
+  });
+}
+
+// ── Configuration items ──
+
+export function useConfigItems() {
+  return useQuery({
+    queryKey: queryKeys.config.all,
+    queryFn: fetchConfigItems,
+  });
+}
+
+export function useUpdateConfigItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ key, value }: { key: string; value: string }) =>
+      updateConfigItem(key, value),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.config.all });
+      toast.success("Configuration updated");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
+  });
+}
+
+export function useResetConfigItem() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (key: string) => resetConfigItem(key),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: queryKeys.config.all });
+      toast.success("Configuration reset to default");
     },
     onError: (err: Error) => {
       toast.error(err.message);

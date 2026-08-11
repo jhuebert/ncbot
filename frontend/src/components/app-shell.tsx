@@ -4,6 +4,7 @@ import {
   MessageSquare,
   Brain,
   Users,
+  Settings,
   Menu,
   X,
   Hash,
@@ -14,6 +15,7 @@ const navItems = [
   { to: "/channels", label: "Channels", icon: Hash },
   { to: "/memory", label: "Global Memory", icon: Brain },
   { to: "/participants", label: "Participants", icon: Users },
+  { to: "/settings", label: "Settings", icon: Settings },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {

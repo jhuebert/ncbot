@@ -218,6 +218,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List all configuration items
+         * @description Returns every known DB-backed configuration item with its type, current value,
+         *     default value, description, and whether a change requires a restart. Items are
+         *     seeded with sensible defaults on first start, so this list is always complete.
+         */
+        get: operations["listConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/config/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update a configuration item
+         * @description Validates the new value against the item's declared type and updates it in the
+         *     database. Runtime items take effect immediately; items that are only read at
+         *     startup are stored now but require a restart to take effect.
+         */
+        put: operations["updateConfig"];
+        post?: never;
+        /**
+         * Reset a configuration item to its default
+         * @description Removes the stored override so the item reverts to its seeded default value.
+         */
+        delete: operations["resetConfig"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/participants": {
         parameters: {
             query?: never;
@@ -429,6 +477,50 @@ export interface components {
              * @example true
              */
             blocked: boolean;
+        };
+        /** @description A DB-backed configuration item with its current value and code-defined metadata. */
+        ConfigItemDto: {
+            /**
+             * @description Dot-namespaced configuration key (e.g. `bot.name`).
+             * @example chat.max-reply-bytes
+             */
+            key?: string;
+            /**
+             * @description Logical value type, used for validation and UI rendering.
+             * @example INT
+             * @enum {string}
+             */
+            type?: "STRING" | "TEXT" | "BOOLEAN" | "INT" | "LONG" | "LIST";
+            /**
+             * @description Current effective value (stored value, or default if not overridden).
+             * @example 128
+             */
+            value?: string;
+            /**
+             * @description The seeded default value.
+             * @example 128
+             */
+            defaultValue?: string;
+            /** @description Human-readable description shown in the admin UI. */
+            description?: string;
+            /**
+             * @description Whether a change only takes effect after an application restart.
+             * @example false
+             */
+            restartRequired?: boolean;
+            /**
+             * @description Whether the current value equals the seeded default (no override stored).
+             * @example true
+             */
+            isDefault?: boolean;
+        };
+        /** @description Request body for updating a configuration item's value. */
+        ConfigItemUpdateRequest: {
+            /**
+             * @description New raw value, validated against the item's declared type.
+             * @example 256
+             */
+            value: string;
         };
         /** @description Paginated message list for a specific channel, including channel metadata. */
         MessagesResponse: {
@@ -1136,6 +1228,90 @@ export interface operations {
                 content?: never;
             };
             /** @description Memory not found or memory is not global (belongs to a channel). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    listConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description All configuration items with metadata. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigItemDto"][];
+                };
+            };
+        };
+    };
+    updateConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Dot-namespaced configuration key (e.g. `bot.name`). */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ConfigItemUpdateRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated configuration item. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigItemDto"];
+                };
+            };
+            /** @description Unknown key or value fails validation. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    resetConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Dot-namespaced configuration key (e.g. `bot.name`). */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The configuration item now uses its default value. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ConfigItemDto"];
+                };
+            };
+            /** @description Unknown configuration item. */
             400: {
                 headers: {
                     [name: string]: unknown;

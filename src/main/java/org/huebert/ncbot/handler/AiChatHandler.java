@@ -12,6 +12,7 @@ import org.huebert.ncbot.entity.ChatMemory;
 import org.huebert.ncbot.entity.ChatMessage;
 import org.huebert.ncbot.repository.ChatMemory2Repository;
 import org.huebert.ncbot.repository.ChatMessageRepository;
+import org.huebert.ncbot.service.ConfigService;
 import org.huebert.ncbot.service.TemplateService;
 import org.huebert.ncbot.tool.WeatherTool;
 import org.huebert.ncbot.util.DebugLog;
@@ -35,6 +36,7 @@ public class AiChatHandler implements ChatHandler {
 
     private final ChatClient chatClient;
     private final NcbotProperties properties;
+    private final ConfigService configService;
     private final TemplateService templateService;
     private final ChatMessageRepository chatMessageRepository;
     private final ChatMemory2Repository chatMemoryRepository;
@@ -43,11 +45,13 @@ public class AiChatHandler implements ChatHandler {
             ChatModel chatModel,
             WeatherTool weatherTool,
             NcbotProperties properties,
+            ConfigService configService,
             TemplateService templateService,
             ChatMessageRepository chatMessageRepository,
             ChatMemory2Repository chatMemoryRepository
     ) {
         this.properties = properties;
+        this.configService = configService;
         this.templateService = templateService;
         this.chatMessageRepository = chatMessageRepository;
         this.chatMemoryRepository = chatMemoryRepository;
@@ -55,7 +59,7 @@ public class AiChatHandler implements ChatHandler {
                 // Cap output tokens per round-trip on the reply path (chat response,
                 // tool-call arguments, and condense). Replies are ≤128 bytes, so 256
                 // is generous; the cap mainly bounds rambling and tool-call loops.
-                .defaultOptions(OpenAiChatOptions.builder().maxTokens(properties.maxReplyTokens()))
+                .defaultOptions(OpenAiChatOptions.builder().maxTokens(configService.maxReplyTokens()))
                 .defaultTools(weatherTool)
                 .build();
     }
@@ -69,12 +73,12 @@ public class AiChatHandler implements ChatHandler {
     @DebugLog
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
 
-        AiMode aiMode = properties.getChannelCapabilities(request)
+        AiMode aiMode = configService.getChannelCapabilities(request)
                 .map(ChannelCapabilities::ai)
                 .orElse(AiMode.DISABLED);
 
         if (aiMode == AiMode.TAGGED) {
-            boolean isTagged = request.messageText() != null && request.messageText().contains("@[" + properties.name() + "]");
+            boolean isTagged = request.messageText() != null && request.messageText().contains("@[" + configService.name() + "]");
             if (!isTagged) {
                 log.debug("handle: ai mode is TAGGED, no tag in {}, skipping", request.channelName());
                 return Optional.empty();
@@ -85,7 +89,7 @@ public class AiChatHandler implements ChatHandler {
             return Optional.empty();
         }
 
-        Pageable pageable = PageRequest.of(0, properties.maxChatHistory());
+        Pageable pageable = PageRequest.of(0, configService.maxChatHistory());
 
         Instant start = chatChannel.getMemoryUpdatedAt();
         Instant end = Instant.now();
@@ -95,7 +99,7 @@ public class AiChatHandler implements ChatHandler {
         }
 
         List<ChatMessage> messages = chatMessageRepository.findChannelMessages(chatChannel.getId(), start, end, pageable).reversed();
-        List<ChatMemory> memories = properties.useMemory()
+        List<ChatMemory> memories = configService.useMemory()
                 ? chatMemoryRepository.findMemory(chatChannel.getId())
                 : List.of();
         log.debug("handle: loaded {} messages, {} memories for channel {}", messages.size(), memories.size(), chatChannel.getChannelName());
@@ -107,7 +111,7 @@ public class AiChatHandler implements ChatHandler {
         ));
 
         String response = chatClient.prompt()
-                .system(properties.systemPrompt())
+                .system(configService.systemPrompt())
                 .user(output)
                 .call()
                 .content();
@@ -123,7 +127,7 @@ public class AiChatHandler implements ChatHandler {
     private Optional<String> condense(ChatRequest request, String response) {
         log.debug("condense: {}", response);
 
-        if (!properties.condense() || (Utf8.encodedLength(response) <= properties.maxReplyBytes())) {
+        if (!configService.condense() || (Utf8.encodedLength(response) <= configService.maxReplyBytes())) {
             log.debug("condense result: no change {}", response);
             return Optional.of(response);
         }
@@ -134,7 +138,7 @@ public class AiChatHandler implements ChatHandler {
         ));
 
         String condensed = chatClient.prompt()
-                .system(properties.condensePrompt())
+                .system(configService.condensePrompt())
                 .user(output)
                 .call()
                 .content();

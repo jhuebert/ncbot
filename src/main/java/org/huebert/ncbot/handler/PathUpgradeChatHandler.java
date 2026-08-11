@@ -3,11 +3,11 @@ package org.huebert.ncbot.handler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.config.ChannelCapabilities;
-import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatParticipant;
 import org.huebert.ncbot.repository.ChatParticipantRepository;
+import org.huebert.ncbot.service.ConfigService;
 import org.huebert.ncbot.service.TemplateService;
 import org.huebert.ncbot.util.DebugLog;
 import org.huebert.ncbot.util.PathUtil;
@@ -26,7 +26,7 @@ public class PathUpgradeChatHandler implements ChatHandler {
     private static final int ORDER = 75;
 
     private final ChatParticipantRepository chatParticipantRepository;
-    private final NcbotProperties properties;
+    private final ConfigService configService;
     private final TemplateService templateService;
 
     @Override
@@ -38,7 +38,7 @@ public class PathUpgradeChatHandler implements ChatHandler {
     @DebugLog
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
 
-        boolean pathUpgrade = properties.getChannelCapabilities(request)
+        boolean pathUpgrade = configService.getChannelCapabilities(request)
                 .map(ChannelCapabilities::pathUpgrade)
                 .orElse(false);
         if (!pathUpgrade) {
@@ -58,7 +58,7 @@ public class PathUpgradeChatHandler implements ChatHandler {
             return Optional.empty();
         }
 
-        int cooldownMinutes = properties.pathUpgradeCooldownMinutes();
+        int cooldownMinutes = configService.pathUpgradeCooldownMinutes();
         Instant notifiedAt = participant.getPathUpgradeNotifiedAt();
         if (notifiedAt != null && notifiedAt.plus(Duration.ofMinutes(cooldownMinutes)).isAfter(Instant.now())) {
             log.debug("handle: {} in cooldown (notified at {})", request.senderName(), notifiedAt);

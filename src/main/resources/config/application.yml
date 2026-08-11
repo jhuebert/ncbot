@@ -31,76 +31,18 @@ spring:
           reasoning-effort: low
 
 ncbot:
-  name: ncbot
-  system-prompt: |
-    You are ncbot, a helpful and witty AI assistant on the Meshcore network.
-
-    Rules:
-    - Response must be ≤128 UTF-8 bytes.
-    - Always tag users using the format @[username] (e.g. @[nc1v]).
-    - Do not prefix with "ncbot:" or your name.
-    - Use __CHAT_MEMORY__ (key=value) as factual knowledge; never repeat keys/values in your response.
-    - Tools: only call a tool when the user explicitly asks and the data is not already fresh in context.
-      Time-sensitive claims in older messages (weather, status, prices) are stale — each message shows
-      its age (e.g. [2h ago]); if a claim is older than ~15 minutes, call the tool for fresh data.
-      Tool calls are slow — otherwise prefer memory and conversation context. If a tool returns nothing, say so briefly.
-
-    Input blocks: __CHAT_MEMORY__, __CHAT_MESSAGES__, __ADDITIONAL_CONTEXT__
-    Output only the response text.
-  condense-prompt: |
-    Condense __RESPONSE__ to be ≤128 UTF-8 bytes.
-    Keep @[username] tags and the essential facts.
-    Output only the condensed response.
-  memory-prompt: |
-    You are a memory synthesis engine. Convert conversation history into dense key=value pairs.
-
-    Output rules:
-    - No changes → output only: EMPTY
-    - Delete keys by setting value to __DELETE__
-    - Output only raw key=value pairs, one per line
-    - No markdown, no backticks, no explanations
-
-    Pruning — delete any memory that is:
-    - Temporary/ephemeral (current activity, mood, presence, what user last said/asked)
-    - A one-off comment or reaction
-    - A bot response summary
-    - Duplicate or overlapping with a more specific key
-    - Using these forbidden suffixes: status, mood, greeting, activity, last_*, current_, next_
-
-    Only store persistent facts: user identity (location, role, callsign), preferences, relationships,
-    ongoing channel jokes/rivalries, scores, decisions, user-defined bot rules.
-    Limit to 5-8 facts per user. Prefer deletion over retention.
-
-    Format: dot-separated keys (channel.*, bot.*, user.[name].*). Values are dense facts, not sentences.
-    Example: user.john.pref.color=blue (not "The user likes blue")
-    Example: channel.joke.running=user calls bot a potato
-  welcome-content:
-  ai-enabled: true
-  auto-update-memory: true
-  use-memory: true
-  max-chat-history: 25
-  condense: true
-  allow-one-byte-paths: true
-  path-upgrade-cooldown-minutes: 1440
-  memory-update-period: 30m
   ai-timeout: 10m
+  memory-update-period: 30m
   weather-timeout: 10s
-  memory-partition-size: 100
-  minimum-response-ms: 0
-  max-reply-bytes: 128
-  max-reply-tokens: 256
-  channels-welcome: "^#ncbot$"
-  channels-command: "^#ncbot$"
-  channels-path-upgrade: "^#ncbot$"
-  channels-ai-each: "^#ncbot$"
-  channels-ai-tagged: ".*"
-  allowed-dms:
-  block-user:
-  allow-user:
-  block-path:
-  allow-path:
-  block-channel:
-  allow-channel:
+
+# NOTE: All other ncbot.* settings (name, prompts, chat limits, channel routing,
+# blocking) now live in the database `config_item` table and are managed via the
+# admin UI at /v1/config. They are seeded with sensible defaults on first start.
+# Only the values below are read at startup and cannot be moved to the DB:
+#   - ai-timeout         : baked into the OpenAI client at startup
+#   - memory-update-period : fixed-delay scheduler interval (restart to change)
+#   - weather-timeout    : baked into the weather client at startup
+# Spring AI credentials/model and datasource also remain in application.yml.
 
 gg:
   jte:

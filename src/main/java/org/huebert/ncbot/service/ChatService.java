@@ -2,7 +2,6 @@ package org.huebert.ncbot.service;
 
 import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.config.ChannelCapabilities;
-import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.dto.ChatResponse;
 import org.huebert.ncbot.entity.ChatChannel;
@@ -22,18 +21,18 @@ public class ChatService {
 
     private static final ChatResponse EMPTY_RESPONSE = new ChatResponse(List.of());
 
-    private final NcbotProperties properties;
+    private final ConfigService configService;
     private final ChannelService channelService;
     private final MessageService messageService;
     private final List<ChatHandler> handlers;
 
     public ChatService(
-            NcbotProperties properties,
+            ConfigService configService,
             ChannelService channelService,
             MessageService messageService,
             List<ChatHandler> handlers
     ) {
-        this.properties = properties;
+        this.configService = configService;
         this.channelService = channelService;
         this.messageService = messageService;
 
@@ -53,7 +52,7 @@ public class ChatService {
         Optional<String> response = generateResponse(chatChannel, request);
         messageService.saveInteraction(chatChannel, request, response.orElse(null));
         return response
-                .map(r -> Truncate.truncateUtf8(r, properties.maxReplyBytes()))
+                .map(r -> Truncate.truncateUtf8(r, configService.maxReplyBytes()))
                 .map(r -> new ChatResponse(List.of(r)))
                 .orElse(EMPTY_RESPONSE);
     }
@@ -62,14 +61,14 @@ public class ChatService {
 
         // DM authorization check
         if (request.isDm()) {
-            if (!properties.allowedDms().isEmpty() && !properties.allowedDms().contains(request.senderKey())) {
+            if (!configService.allowedDms().isEmpty() && !configService.allowedDms().contains(request.senderKey())) {
                 log.debug("skipping DM {}", request.senderKey());
                 return Optional.empty();
             }
         }
 
         // Resolve channel capabilities — if empty, channel is not configured
-        Optional<ChannelCapabilities> capsOpt = properties.getChannelCapabilities(request);
+        Optional<ChannelCapabilities> capsOpt = configService.getChannelCapabilities(request);
         if (capsOpt.isEmpty()) {
             log.debug("skipping channel {}", request.channelName());
             return Optional.empty();

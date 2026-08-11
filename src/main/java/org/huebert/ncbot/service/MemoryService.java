@@ -5,7 +5,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
 import org.huebert.ncbot.config.AiMode;
 import org.huebert.ncbot.config.ChannelCapabilities;
-import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatMemory;
 import org.huebert.ncbot.entity.ChatMessage;
@@ -38,7 +37,7 @@ public class MemoryService {
      */
     private static final int MEMORY_CALL_ATTEMPTS = 3;
 
-    private final NcbotProperties ncbotProperties;
+    private final ConfigService configService;
     private final ChatClient chatClient;
     private final TemplateService templateService;
     private final ChannelService channelService;
@@ -46,14 +45,14 @@ public class MemoryService {
     private final ChatMemory2Repository chatMemoryRepository;
 
     public MemoryService(
-            NcbotProperties ncbotProperties,
+            ConfigService configService,
             ChatModel chatModel,
             ChatMemory2Repository chatMemoryRepository,
             TemplateService templateService,
             ChannelService channelService,
             MessageService messageService
     ) {
-        this.ncbotProperties = ncbotProperties;
+        this.configService = configService;
         this.chatMemoryRepository = chatMemoryRepository;
         this.templateService = templateService;
         this.chatClient = ChatClient.builder(chatModel)
@@ -165,7 +164,7 @@ public class MemoryService {
     @DebugLog
     public void updateMemory() {
 
-        if (!ncbotProperties.useMemory() || !ncbotProperties.autoUpdateMemory()) {
+        if (!configService.useMemory() || !configService.autoUpdateMemory()) {
             log.debug("memory update disabled");
             return;
         }
@@ -188,7 +187,7 @@ public class MemoryService {
         log.debug("channel: {}", channel);
 
         if (!channel.getIsDm()) {
-            ChannelCapabilities caps = ncbotProperties.getChannelCapabilities(channel.getChannelName());
+            ChannelCapabilities caps = configService.getChannelCapabilities(channel.getChannelName());
             if (caps.ai() == AiMode.DISABLED) {
                 log.debug("ai disabled for channel {}, skipping", channel.getChannelName());
                 return;
@@ -201,7 +200,7 @@ public class MemoryService {
             return;
         }
 
-        for (List<ChatMessage> partition : Lists.partition(messages, ncbotProperties.memoryPartitionSize())) {
+        for (List<ChatMessage> partition : Lists.partition(messages, configService.memoryPartitionSize())) {
             updateMemory(channel, partition);
         }
 
@@ -281,7 +280,7 @@ public class MemoryService {
         for (int attempt = 1; attempt <= MEMORY_CALL_ATTEMPTS; attempt++) {
             try {
                 return chatClient.prompt()
-                        .system(ncbotProperties.memoryPrompt())
+                        .system(configService.memoryPrompt())
                         .user(user)
                         .call()
                         .content();

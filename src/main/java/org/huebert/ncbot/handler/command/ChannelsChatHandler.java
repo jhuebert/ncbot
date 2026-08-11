@@ -2,11 +2,11 @@ package org.huebert.ncbot.handler.command;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.repository.ChatChannelRepository;
 import org.huebert.ncbot.repository.ChatMessageRepository;
+import org.huebert.ncbot.service.ConfigService;
 import org.huebert.ncbot.util.Truncate;
 import org.springframework.stereotype.Component;
 
@@ -22,7 +22,7 @@ public class ChannelsChatHandler implements CommandHandler {
 
     private static final Pattern PATTERN = Pattern.compile("^(c|channel|channels)$", Pattern.CASE_INSENSITIVE);
 
-    private final NcbotProperties ncbotProperties;
+    private final ConfigService configService;
 
     private final ChatChannelRepository chatChannelRepository;
 
@@ -43,7 +43,7 @@ public class ChannelsChatHandler implements CommandHandler {
                 .map(a -> channels.get(a.key()).getChannelName())
                 .toList();
 
-        String text = Truncate.joinWithLimit(channelNames, ncbotProperties.maxReplyBytes(), " ");
+        String text = Truncate.joinWithLimit(channelNames, configService.maxReplyBytes(), " ");
         return Map.of(
                 "template", "command/channels",
                 "channels", text.trim()

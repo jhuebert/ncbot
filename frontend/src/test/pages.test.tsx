@@ -1,5 +1,11 @@
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import {
+  render,
+  screen,
+  fireEvent,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter } from "react-router-dom";
 import { http, HttpResponse } from "msw";
@@ -8,6 +14,7 @@ import { queryClient } from "@/lib/query-client";
 import { ChannelsPage } from "@/pages/channels-page";
 import { GlobalMemoryPage } from "@/pages/global-memory-page";
 import { ParticipantsPage } from "@/pages/participants-page";
+import { SettingsPage } from "@/pages/settings-page";
 import { NotFoundPage } from "@/pages/not-found-page";
 
 // Mutable mock state so block/unblock mutations reflect on refetch.
@@ -34,6 +41,45 @@ const participantList: {
     lastSeen: "2026-06-03T14:29:00Z",
     pathUpgradeNotifiedAt: null,
     blocked: false,
+  },
+];
+
+// Mutable config state so update/reset mutations reflect on refetch.
+const configState: {
+  key: string;
+  type: string;
+  value: string;
+  defaultValue: string;
+  description: string;
+  restartRequired: boolean;
+  isDefault: boolean;
+}[] = [
+  {
+    key: "bot.name",
+    type: "STRING",
+    value: "ncbot",
+    defaultValue: "ncbot",
+    description: "Bot display name.",
+    restartRequired: false,
+    isDefault: true,
+  },
+  {
+    key: "chat.max-reply-bytes",
+    type: "INT",
+    value: "128",
+    defaultValue: "128",
+    description: "Maximum UTF-8 byte length of a reply.",
+    restartRequired: false,
+    isDefault: true,
+  },
+  {
+    key: "chat.ai-enabled",
+    type: "BOOLEAN",
+    value: "true",
+    defaultValue: "true",
+    description: "Master switch for the AI.",
+    restartRequired: false,
+    isDefault: true,
   },
 ];
 
@@ -123,6 +169,26 @@ const server = setupServer(
     }
     return HttpResponse.json(participant);
   }),
+  http.get("*/v1/config", () => {
+    return HttpResponse.json(configState);
+  }),
+  http.put("*/v1/config/:key", async ({ request, params }) => {
+    const body = (await request.json()) as { value: string };
+    const item = configState.find((c) => c.key === String(params.key));
+    if (item) {
+      item.value = body.value;
+      item.isDefault = body.value === item.defaultValue;
+    }
+    return HttpResponse.json(item);
+  }),
+  http.delete("*/v1/config/:key", ({ params }) => {
+    const item = configState.find((c) => c.key === String(params.key));
+    if (item) {
+      item.value = item.defaultValue;
+      item.isDefault = true;
+    }
+    return HttpResponse.json(item);
+  }),
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "bypass" }));
@@ -148,6 +214,10 @@ afterEach(() => {
       blocked: false,
     },
   );
+  configState.forEach((c) => {
+    c.value = c.defaultValue;
+    c.isDefault = true;
+  });
 });
 afterAll(() => server.close());
 
@@ -269,5 +339,65 @@ describe("NotFoundPage", () => {
   it("renders not found message", () => {
     renderPage(<NotFoundPage />);
     expect(screen.getByText("Page Not Found")).toBeDefined();
+  });
+});
+
+describe("SettingsPage", () => {
+  it("renders heading and groups", async () => {
+    renderPage(<SettingsPage />);
+    expect(screen.getByText("Settings")).toBeDefined();
+    expect(await screen.findByText("Bot Identity & Prompts")).toBeDefined();
+    expect(screen.getByText("Chat Behaviour")).toBeDefined();
+  });
+
+  it("displays configuration items", async () => {
+    renderPage(<SettingsPage />);
+    expect(await screen.findByText("bot.name")).toBeDefined();
+    expect(screen.getByText("chat.max-reply-bytes")).toBeDefined();
+    expect(screen.getByText("chat.ai-enabled")).toBeDefined();
+  });
+
+  it("updates an integer configuration item", async () => {
+    renderPage(<SettingsPage />);
+    const input = (await screen.findByLabelText(
+      "Value for chat.max-reply-bytes",
+    )) as HTMLInputElement;
+    const row = input.closest("li")!;
+    fireEvent.change(input, { target: { value: "200" } });
+    fireEvent.click(within(row).getByText("Save"));
+    await waitFor(() =>
+      expect(
+        configState.find((c) => c.key === "chat.max-reply-bytes")?.value,
+      ).toBe("200"),
+    );
+    expect(screen.queryByText("Custom")).toBeDefined();
+  });
+
+  it("reverts a custom value to default on reset", async () => {
+    renderPage(<SettingsPage />);
+    const input = (await screen.findByLabelText(
+      "Value for bot.name",
+    )) as HTMLInputElement;
+    const row = input.closest("li")!;
+    fireEvent.change(input, { target: { value: "custom-bot" } });
+    fireEvent.click(within(row).getByText("Save"));
+    await waitFor(() =>
+      expect(configState.find((c) => c.key === "bot.name")?.value).toBe(
+        "custom-bot",
+      ),
+    );
+    // The row remounts after the update; re-query it before resetting.
+    const updatedInput = (await screen.findByLabelText(
+      "Value for bot.name",
+    )) as HTMLInputElement;
+    fireEvent.click(
+      within(updatedInput.closest("li")!).getByText("Reset to default"),
+    );
+    await waitFor(() =>
+      expect(configState.find((c) => c.key === "bot.name")?.value).toBe(
+        "ncbot",
+      ),
+    );
+    expect(screen.queryByText("Custom")).toBeNull();
   });
 });

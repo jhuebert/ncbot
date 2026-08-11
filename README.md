@@ -69,50 +69,59 @@ Browse entities via the custom admin API at `http://localhost:8080/v1/channels`.
 
 ## Configuration
 
-All configuration is via environment variables or `application.yml`:
+Runtime configuration is stored in the **database** (`config_item` table) and managed through
+the admin UI (**Settings** page at `/v1/config`) or the `/v1/config` API. Every item is defined in
+`ConfigItemDefinition` and seeded with a sensible default on first start. Values apply immediately
+(except items flagged as *restart required* — currently `chat.max-reply-tokens`).
 
-| Variable                              | Default                  | Description                                                         |
-|---------------------------------------|--------------------------|---------------------------------------------------------------------|
-| `NCBOT_API_KEY`                       | `default-key`            | API key for the OpenAI-compatible endpoint                          |
-| `NCBOT_OPENAI_BASE_URL`               | *(from application.yml)* | Base URL for the AI server                                          |
-| `NCBOT_MODEL`                         | `ncbot`                  | Model name/identifier                                               |
-| `NCBOT_NAME`                          | `ncbot`                  | Bot display name                                                    |
-| `NCBOT_MINIMUM_RESPONSE_MS`           | `0`                      | Minimum response delay in milliseconds (0 = disabled; pacing handled by RemoteTerm's settle delay + send spacing) |
-| `NCBOT_MAX_REPLY_BYTES`               | `128`                    | Max UTF-8 bytes per reply message                                   |
-| `NCBOT_CONDENSE`                      | `true`                   | Enable AI-based response condensing when over byte limit            |
-| `NCBOT_MEMORY_UPDATE_PERIOD`          | `30m`                    | Scheduled interval for AI memory synthesis                          |
-| `NCBOT_MEMORY_PARTITION_SIZE`         | `100`                    | Number of messages per memory partition                             |
-| `NCBOT_MAX_CHAT_HISTORY`              | `25`                     | Number of recent messages to include in AI prompts                  |
-| `NCBOT_AI_ENABLED`                    | `true`                   | Master switch for AI (when false, all channels default to DISABLED) |
-| `NCBOT_AUTO_UPDATE_MEMORY`            | `true`                   | Enable scheduled memory synthesis                                   |
-| `NCBOT_USE_MEMORY`                    | `true`                   | Include memories in AI prompts                                      |
-| `NCBOT_ALLOW_ONE_BYTE_PATHS`          | `true`                   | Allow 1-byte path messages through the filter                       |
-| `NCBOT_PATH_UPGRADE_COOLDOWN_MINUTES` | `1440`                   | Cooldown between path upgrade notifications                         |
-| `NCBOT_CHANNELS_WELCOME`              | `^#ncbot$`               | Regex pattern for channels that receive welcome messages            |
-| `NCBOT_CHANNELS_COMMAND`              | `^#ncbot$`               | Regex pattern for channels that accept commands                     |
-| `NCBOT_CHANNELS_PATH_UPGRADE`         | `^#ncbot$`               | Regex pattern for path upgrade notifications                        |
-| `NCBOT_CHANNELS_AI_EACH`              | `^#ncbot$`               | Regex pattern for channels where AI responds to every message       |
-| `NCBOT_CHANNELS_AI_TAGGED`            | `.*`                     | Regex pattern for channels where AI responds only when mentioned    |
-| `NCBOT_ALLOWED_DMS`                   | *(empty)*                | Comma-separated list of allowed DM sender hex keys                  |
-| `NCBOT_BLOCK_USER`                    | *(empty)*                | Regex pattern to block users by name                                |
-| `NCBOT_ALLOW_USER`                    | *(empty)*                | Regex pattern to allow users (overrides block)                      |
-| `NCBOT_BLOCK_PATH`                    | *(empty)*                | Regex pattern to block paths                                        |
-| `NCBOT_ALLOW_PATH`                    | *(empty)*                | Regex pattern to allow paths (overrides block)                      |
-| `NCBOT_WELCOME_CONTENT`               | *(empty)*                | Custom welcome message content                                      |
-| `NCBOT_TIMEOUT`                       | `1800`                   | Seconds to wait for ncbot's `/v1/chat` response (bot script)        |
-| `NCBOT_MAX_PENDING`                   | `50`                     | Max in-flight AI requests; beyond this, new messages are dropped    |
-| `RT_API_URL`                          | `http://localhost:8000/api` | RemoteTerm HTTP API base URL for delivering replies (bot script)  |
-| `RT_API_TIMEOUT`                      | `30`                     | Seconds per RemoteTerm API delivery call (bot script)               |
-| `NCBOT_MESSAGE_SPACING`               | `2.0`                    | Min seconds between bot sends (bot script; reimplements RemoteTerm's spacing) |
-| `NCBOT_AI_TIMEOUT`                    | `10m`                    | Max time for the AI model to answer (applies to the OpenAI SDK client)      |
-| `NCBOT_WEATHER_TIMEOUT`               | `10s`                    | Max time for weather tool lookups (prevents hung tool calls from stalling AI) |
-| `NCBOT_MAX_REPLY_TOKENS`               | `256`                    | Cap on output tokens per AI round-trip on the reply path (chat, tool-call args, condense). Memory synthesis is not capped |
-| `reasoning-effort` (yaml `spring.ai.openai.chat.options.reasoning-effort`) | `low` | Reasoning effort; model-dependent values (deepseek-v4-flash: `max`/`high`/`low`, default `high` — `low` is fastest; `none` is invalid for it). Env `SPRING_AI_OPENAI_CHAT_OPTIONS_REASONING_EFFORT` |
-| `NCBOT_SYSTEM_PROMPT`                 | *(from application.yml)* | System prompt for AI                                                |
-| `NCBOT_CONDENSE_PROMPT`               | *(from application.yml)* | Prompt for response condensing                                      |
-| `NCBOT_MEMORY_PROMPT`                 | *(from application.yml)* | Prompt for memory synthesis                                         |
+Only secrets, infrastructure, and values consumed solely at startup remain in `application.yml`
+/env vars:
+
+| Variable | Default | Description |
+|---|---|---|
+| `NCBOT_API_KEY` | `default-key` | API key for the OpenAI-compatible endpoint |
+| `NCBOT_OPENAI_BASE_URL` | *(from application.yml)* | Base URL for the AI server |
+| `NCBOT_MODEL` | `ncbot` | Model name/identifier |
+| `NCBOT_MEMORY_UPDATE_PERIOD` | `30m` | Scheduled interval for AI memory synthesis (restart to change) |
+| `NCBOT_AI_TIMEOUT` | `10m` | Max time for the AI model to answer (applies to the OpenAI SDK client) |
+| `NCBOT_WEATHER_TIMEOUT` | `10s` | Max time for weather tool lookups |
+| `reasoning-effort` (`spring.ai.openai.chat.options.reasoning-effort`) | `low` | Reasoning effort; model-dependent (deepseek-v4-flash: `max`/`high`/`low`). Env `SPRING_AI_OPENAI_CHAT_OPTIONS_REASONING_EFFORT` |
+
+Previously `NCBOT_*`-configurable items (`NCBOT_NAME`, `NCBOT_MAX_REPLY_BYTES`,
+`NCBOT_AI_ENABLED`, `NCBOT_CHANNELS_*`, `NCBOT_BLOCK_*`, prompts, etc.) now live in the DB — set
+them via the Settings UI instead of environment variables.
+
+Bot-script (`bot.py`) options follow in the Deployment section.
+
+### Database-Backed Configuration
+
+The `config_item` table is a key–value store keyed by dot-separated names, seeded and managed by
+`ConfigService`:
+
+| Namespace | Example keys | Type |
+|---|---|---|
+| `bot.*` | `bot.name`, `bot.system-prompt`, `bot.condense-prompt`, `bot.memory-prompt` | STRING / TEXT |
+| `chat.*` | `chat.welcome-content`, `chat.max-history`, `chat.ai-enabled`, `chat.auto-update-memory`, `chat.use-memory`, `chat.condense`, `chat.allow-one-byte-paths`, `chat.path-upgrade-cooldown-minutes`, `chat.minimum-response-ms`, `chat.max-reply-bytes`, `chat.max-reply-tokens` | BOOLEAN / INT / LONG |
+| `memory.*` | `memory.partition-size` | INT |
+| `channels.*` | `channels.welcome`, `channels.command`, `channels.path-upgrade`, `channels.ai-each`, `channels.ai-tagged`, `channels.allowed-dms` | STRING / LIST |
+| `blocking.*` | `blocking.block-user`, `blocking.allow-user`, `blocking.block-path`, `blocking.allow-path`, `blocking.block-channel`, `blocking.allow-channel` | STRING |
+
+- **GET `/v1/config`** — every item with type, current/default value, description and restart flag
+- **PUT `/v1/config/{key}`** — update (validated by type; invalid → `400`)
+- **DELETE `/v1/config/{key}`** — reset to default
 
 ### Channel Configuration (Regex Patterns)
+
+Channels are configured via regex patterns stored in the DB (`channels.*` keys) — one per
+capability, matched against the channel name:
+
+| Key | Default |
+|---|---|
+| `channels.welcome` | `^#ncbot$` |
+| `channels.command` | `^#ncbot$` |
+| `channels.path-upgrade` | `^#ncbot$` |
+| `channels.ai-each` | `^#ncbot$` |
+| `channels.ai-tagged` | `.*` |
 
 Channels are configured via regex patterns — one per capability. Each pattern is matched against the channel name:
 
@@ -133,21 +142,14 @@ ncbot:
 
 **Other flags** (`welcome`, `command`, `path-upgrade`) are independent boolean flags — presence in the list means `true`, absence means `false`.
 
-**Environment variable example:**
-```bash
-NCBOT_CHANNELS_AI_EACH="^#ncbot$"
-NCBOT_CHANNELS_AI_TAGGED=".*"
-```
+Set these keys in the DB via the Settings UI (or `PUT /v1/config/{key}`); e.g.
+`channels.ai-each = "^#ncbot$"`, `channels.ai-tagged = ".*"`.
 
 ### User/Path Blocking
 
-```yaml
-ncbot:
-  block-user: ".*(bot|spam|scam).*"
-  allow-user: "admin.*"
-  block-path: ".*malicious.*"
-  allow-path: "internal.*"
-```
+Rules are DB settings under `blocking.*` (e.g. `blocking.block-user = ".*(bot|spam|scam).*"`,
+`blocking.allow-user = "admin.*"`, `blocking.block-path`, `blocking.allow-path`), edited via the
+Settings UI.
 
 **Precedence:** allow always beats block. If a user/path matches an allow pattern, they are allowed regardless of block patterns.
 
@@ -159,12 +161,8 @@ A blocked participant behaves like a `block-user` regex match — the bot ignore
 
 ### DM Access Control
 
-DMs are controlled via a comma-separated list of allowed sender keys:
-
-```yaml
-ncbot:
-  allowed-dms: "hex-key-1, hex-key-2"
-```
+DMs are controlled via a comma-separated list of allowed sender keys. Set the
+`channels.allowed-dms` DB setting (e.g. `"hex-key-1, hex-key-2"`) in the Settings UI.
 
 Leave empty or unset to block all DMs. DMs always have `ai: EACH`, `welcome: true`, and `command: true`.
 
@@ -306,7 +304,7 @@ SQLite database file lives at `/data/ncbot.db` inside the container. The `docker
 
 ### Responses Too Long
 
-- Reduce `NCBOT_MAX_REPLY_BYTES` (default 128)
+- Reduce `chat.max-reply-bytes` (default 128) in the Settings UI
 - The system prompt instructs the AI to keep responses under the limit
 - Condensing is enabled by default — a second AI call will compress oversized responses
 
@@ -315,8 +313,8 @@ SQLite database file lives at `/data/ncbot.db` inside the container. The `docker
 The bot is async, so latency = RemoteTerm's 2 s settle delay + ncbot processing + mesh send. To speed up ncbot processing:
 
 - `reasoning-effort: low` is set by default (deepseek-v4-flash's fastest supported effort — the model default is `high`)
-- `NCBOT_MAX_REPLY_TOKENS` (default 256) caps output generation
-- Reduce `NCBOT_MAX_CHAT_HISTORY` (default 25) — fewer input tokens means faster prefill and lower cost (matters on OpenRouter)
+- `chat.max-reply-tokens` (default 256) caps output generation (restart required)
+- Reduce `chat.max-history` (default 25) in Settings — fewer input tokens means faster prefill and lower cost (matters on OpenRouter)
 - On OpenRouter, pick a fast non-reasoning model — model choice is the single biggest speed lever
 - OpenRouter-only (YAML `extra-body`): `provider.sort: throughput` routes to the fastest provider; `transforms: ["middle-out"]` roughly halves output tokens
 - `NCBOT_AI_TIMEOUT` (default 10 min) caps how long a call may take; lower it to fail fast, but keep it generous — OpenRouter free-tier can queue
@@ -324,16 +322,16 @@ The bot is async, so latency = RemoteTerm's 2 s settle delay + ncbot processing 
 
 ### User Blocked Unexpectedly
 
-- Check `block-user` — the user name may match a regex
+- Check `blocking.block-user` (Settings) — the user name may match a regex
 - Check the participant's `blocked` flag — it may have been blocked via the admin API/frontend
-- Use `allow-user` to whitelist specific users
+- Use `blocking.allow-user` (Settings) to whitelist specific users
 - Check logs for "blocked" messages
 
 ### 1-Byte Path Messages Not Responding
 
-- 1-byte paths are **allowed by default** (`NCBOT_ALLOW_ONE_BYTE_PATHS=true`). If set to `false`, `PathFilterChatHandler` blocks them from reaching command/AI handlers.
+- 1-byte paths are **allowed by default** (`chat.allow-one-byte-paths = true`). If set to `false`, `PathFilterChatHandler` blocks them from reaching command/AI handlers.
 - Welcome and path-upgrade notifications still work for blocked paths.
-- Check `NCBOT_ALLOW_ONE_BYTE_PATHS` setting if 1-byte path messages are unexpectedly blocked.
+- Check the `chat.allow-one-byte-paths` setting (Settings UI) if 1-byte path messages are unexpectedly blocked.
 
 ## Upgrading
 

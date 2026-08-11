@@ -2,10 +2,10 @@ package org.huebert.ncbot.handler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.handler.command.CommandHandler;
+import org.huebert.ncbot.service.ConfigService;
 import org.huebert.ncbot.service.TemplateService;
 import org.huebert.ncbot.util.DebugLog;
 import org.springframework.stereotype.Component;
@@ -24,7 +24,7 @@ public class CommandChatHandler implements ChatHandler {
 
     private static final int ORDER = 50;
 
-    private final NcbotProperties ncbotProperties;
+    private final ConfigService configService;
 
     private final TemplateService templateService;
 
@@ -39,7 +39,7 @@ public class CommandChatHandler implements ChatHandler {
     @DebugLog
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
 
-        if (!ncbotProperties.isCommandEnabled(request)) {
+        if (!configService.isCommandEnabled(request)) {
             log.debug("commands are not enabled for {}", chatChannel.getChannelName());
             return Optional.empty();
         }

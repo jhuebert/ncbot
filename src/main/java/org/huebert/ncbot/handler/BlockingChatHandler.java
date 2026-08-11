@@ -3,11 +3,11 @@ package org.huebert.ncbot.handler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.logging.log4j.util.Strings;
-import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatParticipant;
 import org.huebert.ncbot.repository.ChatParticipantRepository;
+import org.huebert.ncbot.service.ConfigService;
 import org.huebert.ncbot.util.DebugLog;
 import org.huebert.ncbot.util.PatternUtil;
 import org.springframework.stereotype.Component;
@@ -32,7 +32,7 @@ public class BlockingChatHandler implements ChatHandler {
 
     private static final int ORDER = 200;
 
-    private final NcbotProperties properties;
+    private final ConfigService configService;
     private final ChatParticipantRepository chatParticipantRepository;
 
     @Override
@@ -54,8 +54,8 @@ public class BlockingChatHandler implements ChatHandler {
     private String shouldBlock(ChatRequest request) {
 
         String senderName = request.senderName();
-        if (PatternUtil.matches(senderName, properties.allowUser())) {
-            log.debug("allowed user {} (matched allow pattern {})", senderName, properties.allowUser());
+        if (PatternUtil.matches(senderName, configService.allowUser())) {
+            log.debug("allowed user {} (matched allow pattern {})", senderName, configService.allowUser());
             return null;
         }
 
@@ -63,29 +63,29 @@ public class BlockingChatHandler implements ChatHandler {
             return "participant:" + senderName;
         }
 
-        if (PatternUtil.matches(senderName, properties.blockUser())) {
+        if (PatternUtil.matches(senderName, configService.blockUser())) {
             return "user:" + senderName;
         }
 
         String path = Strings.join(request.getPathItems(), ',');
-        if (PatternUtil.matches(path, properties.allowPath())) {
-            log.debug("allowed path for {} (matched allow pattern {})", senderName, properties.allowPath());
+        if (PatternUtil.matches(path, configService.allowPath())) {
+            log.debug("allowed path for {} (matched allow pattern {})", senderName, configService.allowPath());
             return null;
         }
 
-        if (PatternUtil.matches(path, properties.blockPath())) {
-            return "path:" + properties.blockPath();
+        if (PatternUtil.matches(path, configService.blockPath())) {
+            return "path:" + configService.blockPath();
         }
 
         // DMs skip channel-level blocking
         if (!request.isDm()) {
             String channelName = request.channelName();
-            if (PatternUtil.matches(channelName, properties.allowChannel())) {
-                log.debug("allowed channel {} (matched allow pattern {})", channelName, properties.allowChannel());
+            if (PatternUtil.matches(channelName, configService.allowChannel())) {
+                log.debug("allowed channel {} (matched allow pattern {})", channelName, configService.allowChannel());
                 return null;
             }
 
-            if (PatternUtil.matches(channelName, properties.blockChannel())) {
+            if (PatternUtil.matches(channelName, configService.blockChannel())) {
                 return "channel:" + channelName;
             }
         }

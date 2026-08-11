@@ -56,6 +56,44 @@ export interface MessagesResponse {
 export type MemoryCreateRequest = components["schemas"]["MemoryCreateRequest"];
 export type MemoryUpdateRequest = components["schemas"]["MemoryUpdateRequest"];
 
+// ── Configuration items ──
+
+export interface ConfigItemDto {
+  key: string;
+  type: "STRING" | "TEXT" | "BOOLEAN" | "INT" | "LONG" | "LIST";
+  value: string;
+  defaultValue: string;
+  description: string;
+  restartRequired: boolean;
+  isDefault: boolean;
+}
+
+export async function fetchConfigItems(): Promise<ConfigItemDto[]> {
+  const { data, error, response } = await client.GET("/v1/config");
+  if (error) throw await parseApiError(response);
+  return (data ?? []) as ConfigItemDto[];
+}
+
+export async function updateConfigItem(
+  key: string,
+  value: string,
+): Promise<ConfigItemDto> {
+  const { data, error, response } = await client.PUT("/v1/config/{key}", {
+    params: { path: { key } },
+    body: { value },
+  });
+  if (error) throw await parseApiError(response);
+  return data as unknown as ConfigItemDto;
+}
+
+export async function resetConfigItem(key: string): Promise<ConfigItemDto> {
+  const { data, error, response } = await client.DELETE("/v1/config/{key}", {
+    params: { path: { key } },
+  });
+  if (error) throw await parseApiError(response);
+  return data as unknown as ConfigItemDto;
+}
+
 // ── Channels ──
 
 export async function fetchChannels(params?: {

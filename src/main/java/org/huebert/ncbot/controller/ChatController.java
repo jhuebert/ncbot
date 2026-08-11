@@ -2,10 +2,10 @@ package org.huebert.ncbot.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.dto.ChatResponse;
 import org.huebert.ncbot.service.ChatService;
+import org.huebert.ncbot.service.ConfigService;
 import org.huebert.ncbot.util.DebugLog;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -23,7 +23,7 @@ public class ChatController {
 
     private final ChatService chatService;
 
-    private final NcbotProperties ncbotProperties;
+    private final ConfigService configService;
 
     @PostMapping("/chat")
     @DebugLog
@@ -34,7 +34,7 @@ public class ChatController {
             if (!response.replies().isEmpty()) {
                 String reply = response.replies().getFirst();
                 log.debug("response: {} ({} bytes)", reply, reply.length());
-                long delay = ncbotProperties.minimumResponseMs() - (System.currentTimeMillis() - start);
+                long delay = configService.minimumResponseMs() - (System.currentTimeMillis() - start);
                 if (delay > 0) {
                     log.debug("delaying {} ms", delay);
                     try {

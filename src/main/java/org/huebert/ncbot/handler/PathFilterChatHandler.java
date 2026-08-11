@@ -2,11 +2,11 @@ package org.huebert.ncbot.handler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.util.DebugLog;
 import org.huebert.ncbot.util.PathUtil;
+import org.huebert.ncbot.service.ConfigService;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
@@ -24,7 +24,7 @@ public class PathFilterChatHandler implements ChatHandler {
 
     private static final int ORDER = 60;
 
-    private final NcbotProperties properties;
+    private final ConfigService configService;
 
     @Override
     public int getOrder() {
@@ -34,7 +34,7 @@ public class PathFilterChatHandler implements ChatHandler {
     @Override
     @DebugLog
     public Optional<String> handle(ChatChannel chatChannel, ChatRequest request) {
-        if (!properties.allowOneBytePaths() && PathUtil.isUsingOneBytePath(request)) {
+        if (!configService.allowOneBytePaths() && PathUtil.isUsingOneBytePath(request)) {
             return Optional.of(DO_NOT_RESPOND);
         }
         return Optional.empty();

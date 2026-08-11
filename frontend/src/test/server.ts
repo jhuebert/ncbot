@@ -101,6 +101,48 @@ export const mockParticipants = [
   },
 ];
 
+export const mockConfigItems = [
+  {
+    key: "bot.name",
+    type: "STRING",
+    value: "ncbot",
+    defaultValue: "ncbot",
+    description: "Bot display name.",
+    restartRequired: false,
+    isDefault: true,
+  },
+  {
+    key: "chat.max-reply-bytes",
+    type: "INT",
+    value: "128",
+    defaultValue: "128",
+    description: "Maximum UTF-8 byte length of a reply.",
+    restartRequired: false,
+    isDefault: true,
+  },
+  {
+    key: "chat.ai-enabled",
+    type: "BOOLEAN",
+    value: "true",
+    defaultValue: "true",
+    description: "Master switch for the AI.",
+    restartRequired: false,
+    isDefault: true,
+  },
+  {
+    key: "chat.max-reply-tokens",
+    type: "INT",
+    value: "256",
+    defaultValue: "256",
+    description: "Maximum output tokens per AI call.",
+    restartRequired: true,
+    isDefault: true,
+  },
+];
+
+// Mutable copy so update/reset mutations reflect on refetch.
+export const mockConfigState = mockConfigItems.map((c) => ({ ...c }));
+
 function pageResponse<T>(content: T[]) {
   return {
     content,
@@ -196,6 +238,32 @@ export const handlers = [
   // Global Participants
   http.get("*/v1/participants", () => {
     return HttpResponse.json(pageResponse(mockParticipants));
+  }),
+
+  // Configuration items
+  http.get("*/v1/config", () => {
+    return HttpResponse.json(mockConfigState);
+  }),
+
+  http.put("*/v1/config/:key", async ({ request, params }) => {
+    const body = (await request.json()) as { value: string };
+    const item = mockConfigState.find((c) => c.key === String(params.key));
+    if (!item) {
+      return new HttpResponse("Unknown configuration item", { status: 400 });
+    }
+    item.value = body.value;
+    item.isDefault = body.value === item.defaultValue;
+    return HttpResponse.json({ ...item });
+  }),
+
+  http.delete("*/v1/config/:key", ({ params }) => {
+    const item = mockConfigState.find((c) => c.key === String(params.key));
+    if (!item) {
+      return new HttpResponse("Unknown configuration item", { status: 400 });
+    }
+    item.value = item.defaultValue;
+    item.isDefault = true;
+    return HttpResponse.json({ ...item });
   }),
 
   http.put("*/v1/participants/:participantId", async ({ request, params }) => {

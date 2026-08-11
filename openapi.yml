@@ -27,6 +27,8 @@ tags:
     description: Create, read, update, delete, and promote AI-synthesized memories
   - name: Participants
     description: Browse users who have participated in chat channels
+  - name: Configuration
+    description: Manage database-backed runtime configuration items
 
 paths:
   /v1/channels:
@@ -673,6 +675,82 @@ paths:
         "400":
           description: Memory not found or memory is not global (belongs to a channel).
 
+  /v1/config:
+    get:
+      tags:
+        - Configuration
+      summary: List all configuration items
+      description: |
+        Returns every known DB-backed configuration item with its type, current value,
+        default value, description, and whether a change requires a restart. Items are
+        seeded with sensible defaults on first start, so this list is always complete.
+      operationId: listConfig
+      responses:
+        "200":
+          description: All configuration items with metadata.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ConfigItemDto"
+
+  /v1/config/{key}:
+    put:
+      tags:
+        - Configuration
+      summary: Update a configuration item
+      description: |
+        Validates the new value against the item's declared type and updates it in the
+        database. Runtime items take effect immediately; items that are only read at
+        startup are stored now but require a restart to take effect.
+      operationId: updateConfig
+      parameters:
+        - name: key
+          in: path
+          required: true
+          description: Dot-namespaced configuration key (e.g. `bot.name`).
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConfigItemUpdateRequest"
+      responses:
+        "200":
+          description: The updated configuration item.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigItemDto"
+        "400":
+          description: Unknown key or value fails validation.
+    delete:
+      tags:
+        - Configuration
+      summary: Reset a configuration item to its default
+      description: |
+        Removes the stored override so the item reverts to its seeded default value.
+      operationId: resetConfig
+      parameters:
+        - name: key
+          in: path
+          required: true
+          description: Dot-namespaced configuration key (e.g. `bot.name`).
+          schema:
+            type: string
+      responses:
+        "200":
+          description: The configuration item now uses its default value.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConfigItemDto"
+        "400":
+          description: Unknown configuration item.
+
   /v1/participants:
     get:
       tags:
@@ -975,6 +1053,57 @@ components:
           type: boolean
           description: Whether the participant should be blocked.
           example: true
+
+    ConfigItemDto:
+      type: object
+      description: |
+        A DB-backed configuration item with its current value and code-defined metadata.
+      properties:
+        key:
+          type: string
+          description: Dot-namespaced configuration key (e.g. `bot.name`).
+          example: "chat.max-reply-bytes"
+        type:
+          type: string
+          enum:
+            - STRING
+            - TEXT
+            - BOOLEAN
+            - INT
+            - LONG
+            - LIST
+          description: Logical value type, used for validation and UI rendering.
+          example: "INT"
+        value:
+          type: string
+          description: Current effective value (stored value, or default if not overridden).
+          example: "128"
+        defaultValue:
+          type: string
+          description: The seeded default value.
+          example: "128"
+        description:
+          type: string
+          description: Human-readable description shown in the admin UI.
+        restartRequired:
+          type: boolean
+          description: Whether a change only takes effect after an application restart.
+          example: false
+        isDefault:
+          type: boolean
+          description: Whether the current value equals the seeded default (no override stored).
+          example: true
+
+    ConfigItemUpdateRequest:
+      type: object
+      required:
+        - value
+      description: Request body for updating a configuration item's value.
+      properties:
+        value:
+          type: string
+          description: New raw value, validated against the item's declared type.
+          example: "256"
 
     # ── Response Wrappers ──
 

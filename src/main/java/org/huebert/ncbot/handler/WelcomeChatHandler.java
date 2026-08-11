@@ -3,11 +3,11 @@ package org.huebert.ncbot.handler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.config.ChannelCapabilities;
-import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatParticipant;
 import org.huebert.ncbot.repository.ChatParticipantRepository;
+import org.huebert.ncbot.service.ConfigService;
 import org.huebert.ncbot.service.TemplateService;
 import org.huebert.ncbot.util.DebugLog;
 import org.springframework.stereotype.Component;
@@ -24,7 +24,7 @@ public class WelcomeChatHandler implements ChatHandler {
     private static final int ORDER = 100;
 
     private final ChatParticipantRepository chatParticipantRepository;
-    private final NcbotProperties ncbotProperties;
+    private final ConfigService configService;
     private final TemplateService templateService;
 
     @Override
@@ -52,7 +52,7 @@ public class WelcomeChatHandler implements ChatHandler {
                 .lastSeen(now)
                 .build());
 
-        boolean welcome = ncbotProperties.getChannelCapabilities(request)
+        boolean welcome = configService.getChannelCapabilities(request)
                 .map(ChannelCapabilities::welcome)
                 .orElse(false);
 
@@ -60,7 +60,7 @@ public class WelcomeChatHandler implements ChatHandler {
             log.debug("welcome sent to {} in {}", request.senderName(), request.channelName());
             String response = templateService.render("welcome", Map.of(
                     "request", request,
-                    "welcomeContent", ncbotProperties.welcomeContent()
+                    "welcomeContent", configService.welcomeContent()
             ));
             return Optional.of(response);
         }

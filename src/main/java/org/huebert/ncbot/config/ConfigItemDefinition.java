@@ -1,0 +1,320 @@
+package org.huebert.ncbot.config;
+
+import java.util.Comparator;
+import java.util.Locale;
+
+/**
+ * Registry of every configuration item ncbot understands. This is the single,
+ * code-level source of truth for configuration: keys, types, defaults, user-facing
+ * descriptions, and whether a change requires an application restart to take effect.
+ * <p>
+ * Adding a new runtime configuration item is a one-line change here — the database
+ * row is seeded automatically on startup with {@link #defaultValue()} and the admin
+ * UI surfaces it without further wiring.
+ * <p>
+ * Keys use dot-separated names (e.g. {@code bot.name}, {@code channels.ai-each}).
+ */
+public enum ConfigItemDefinition {
+
+    // ── Bot identity & prompts ─────────────────────────────────────────
+
+    NAME(
+            "bot.name",
+            ConfigType.STRING,
+            "ncbot",
+            "Bot display name. Used for @[name] tags and general identification.",
+            false),
+
+    SYSTEM_PROMPT(
+            "bot.system-prompt",
+            ConfigType.TEXT,
+            """
+            You are ncbot, a helpful and witty AI assistant on the Meshcore network.
+
+            Rules:
+            - Response must be ≤128 UTF-8 bytes.
+            - Always tag users using the format @[username] (e.g. @[nc1v]).
+            - Do not prefix with "ncbot:" or your name.
+            - Use __CHAT_MEMORY__ (key=value) as factual knowledge; never repeat keys/values in your response.
+            - Tools: only call a tool when the user explicitly asks and the data is not already fresh in context.
+              Time-sensitive claims in older messages (weather, status, prices) are stale — each message shows
+              its age (e.g. [2h ago]); if a claim is older than ~15 minutes, call the tool for fresh data.
+              Tool calls are slow — otherwise prefer memory and conversation context. If a tool returns nothing, say so briefly.
+
+            Input blocks: __CHAT_MEMORY__, __CHAT_MESSAGES__, __ADDITIONAL_CONTEXT__
+            Output only the response text.
+            """,
+            "System prompt used for every AI chat reply.",
+            false),
+
+    CONDENSE_PROMPT(
+            "bot.condense-prompt",
+            ConfigType.TEXT,
+            """
+            Condense __RESPONSE__ to be ≤128 UTF-8 bytes.
+            Keep @[username] tags and the essential facts.
+            Output only the condensed response.
+            """,
+            "Prompt used to compress overly long responses.",
+            false),
+
+    MEMORY_PROMPT(
+            "bot.memory-prompt",
+            ConfigType.TEXT,
+            """
+            You are a memory synthesis engine. Convert conversation history into dense key=value pairs.
+
+            Output rules:
+            - No changes → output only: EMPTY
+            - Delete keys by setting value to __DELETE__
+            - Output only raw key=value pairs, one per line
+            - No markdown, no backticks, no explanations
+
+            Pruning — delete any memory that is:
+            - Temporary/ephemeral (current activity, mood, presence, what user last said/asked)
+            - A one-off comment or reaction
+            - A bot response summary
+            - Duplicate or overlapping with a more specific key
+            - Using these forbidden suffixes: status, mood, greeting, activity, last_*, current_, next_
+
+            Only store persistent facts: user identity (location, role, callsign), preferences, relationships,
+            ongoing channel jokes/rivalries, scores, decisions, user-defined bot rules.
+            Limit to 5-8 facts per user. Prefer deletion over retention.
+
+            Format: dot-separated keys (channel.*, bot.*, user.[name].*). Values are dense facts, not sentences.
+            Example: user.john.pref.color=blue (not "The user likes blue")
+            Example: channel.joke.running=user calls bot a potato
+            """,
+            "Prompt used for scheduled memory synthesis.",
+            false),
+
+    WELCOME_CONTENT(
+            "chat.welcome-content",
+            ConfigType.TEXT,
+            "",
+            "Content shown to brand-new participants in welcome channels. Leave empty for a generic welcome.",
+            false),
+
+    // ── Chat behaviour ─────────────────────────────────────────────────
+
+    MAX_CHAT_HISTORY(
+            "chat.max-history",
+            ConfigType.INT,
+            "25",
+            "Maximum number of recent messages included in an AI chat prompt.",
+            false),
+
+    AI_ENABLED(
+            "chat.ai-enabled",
+            ConfigType.BOOLEAN,
+            "true",
+            "Master switch for the AI. When false, no channel resolves to an AI mode.",
+            false),
+
+    AUTO_UPDATE_MEMORY(
+            "chat.auto-update-memory",
+            ConfigType.BOOLEAN,
+            "true",
+            "Whether scheduled memory synthesis runs automatically.",
+            false),
+
+    USE_MEMORY(
+            "chat.use-memory",
+            ConfigType.BOOLEAN,
+            "true",
+            "Whether stored memories are included in AI chat prompts.",
+            false),
+
+    CONDENSE(
+            "chat.condense",
+            ConfigType.BOOLEAN,
+            "true",
+            "Whether responses longer than the byte limit are condensed by a second AI call.",
+            false),
+
+    ALLOW_ONE_BYTE_PATHS(
+            "chat.allow-one-byte-paths",
+            ConfigType.BOOLEAN,
+            "true",
+            "Whether messages on 1-byte paths reach command and AI handlers.",
+            false),
+
+    PATH_UPGRADE_COOLDOWN_MINUTES(
+            "chat.path-upgrade-cooldown-minutes",
+            ConfigType.INT,
+            "1440",
+            "Cooldown in minutes between path-upgrade notifications for a participant.",
+            false),
+
+    MINIMUM_RESPONSE_MS(
+            "chat.minimum-response-ms",
+            ConfigType.LONG,
+            "0",
+            "Minimum response delay in milliseconds (0 = none).",
+            false),
+
+    MAX_REPLY_BYTES(
+            "chat.max-reply-bytes",
+            ConfigType.INT,
+            "128",
+            "Maximum UTF-8 byte length of a reply.",
+            false),
+
+    MAX_REPLY_TOKENS(
+            "chat.max-reply-tokens",
+            ConfigType.INT,
+            "256",
+            "Maximum output tokens allowed per AI call.",
+            true),
+
+    // ── Memory system ──────────────────────────────────────────────────
+
+    MEMORY_PARTITION_SIZE(
+            "memory.partition-size",
+            ConfigType.INT,
+            "100",
+            "Number of messages sent to the model in each memory-synthesis partition.",
+            false),
+
+    // ── Channel routing ────────────────────────────────────────────────
+
+    CHANNELS_WELCOME(
+            "channels.welcome",
+            ConfigType.STRING,
+            "^#ncbot$",
+            "Regex for channels where new participants are welcomed.",
+            false),
+
+    CHANNELS_COMMAND(
+            "channels.command",
+            ConfigType.STRING,
+            "^#ncbot$",
+            "Regex for channels where shortcut commands are enabled.",
+            false),
+
+    CHANNELS_PATH_UPGRADE(
+            "channels.path-upgrade",
+            ConfigType.STRING,
+            "^#ncbot$",
+            "Regex for channels where path-upgrade notices are shown.",
+            false),
+
+    CHANNELS_AI_EACH(
+            "channels.ai-each",
+            ConfigType.STRING,
+            "^#ncbot$",
+            "Regex for channels where AI responds to every message.",
+            false),
+
+    CHANNELS_AI_TAGGED(
+            "channels.ai-tagged",
+            ConfigType.STRING,
+            ".*",
+            "Regex for channels where AI responds only when the bot is tagged.",
+            false),
+
+    ALLOWED_DMS(
+            "channels.allowed-dms",
+            ConfigType.LIST,
+            "",
+            "Comma-separated sender keys allowed to DM the bot. Empty list = all blocked.",
+            false),
+
+    // ── Blocking & filtering ───────────────────────────────────────────
+
+    BLOCK_USER(
+            "blocking.block-user",
+            ConfigType.STRING,
+            "",
+            "Regex of user names to block. Allow patterns take precedence.",
+            false),
+
+    ALLOW_USER(
+            "blocking.allow-user",
+            ConfigType.STRING,
+            "",
+            "Regex of user names always allowed, regardless of block patterns.",
+            false),
+
+    BLOCK_PATH(
+            "blocking.block-path",
+            ConfigType.STRING,
+            "",
+            "Regex of paths to block.",
+            false),
+
+    ALLOW_PATH(
+            "blocking.allow-path",
+            ConfigType.STRING,
+            "",
+            "Regex of paths always allowed, regardless of block patterns.",
+            false),
+
+    BLOCK_CHANNEL(
+            "blocking.block-channel",
+            ConfigType.STRING,
+            "",
+            "Regex of channel names to block (non-DM only).",
+            false),
+
+    ALLOW_CHANNEL(
+            "blocking.allow-channel",
+            ConfigType.STRING,
+            "",
+            "Regex of channel names always allowed, regardless of block patterns.",
+            false);
+
+    private final String key;
+    private final ConfigType type;
+    private final String defaultValue;
+    private final String description;
+    private final boolean restartRequired;
+
+    ConfigItemDefinition(String key, ConfigType type, String defaultValue, String description, boolean restartRequired) {
+        this.key = key;
+        this.type = type;
+        this.defaultValue = defaultValue;
+        this.description = description;
+        this.restartRequired = restartRequired;
+    }
+
+    public String key() {
+        return key;
+    }
+
+    public ConfigType type() {
+        return type;
+    }
+
+    public String defaultValue() {
+        return defaultValue;
+    }
+
+    public String description() {
+        return description;
+    }
+
+    public boolean restartRequired() {
+        return restartRequired;
+    }
+
+    /** Look up a definition by its dot-separated key. */
+    public static ConfigItemDefinition fromKey(String key) {
+        for (ConfigItemDefinition def : values()) {
+            if (def.key.equalsIgnoreCase(key)) {
+                return def;
+            }
+        }
+        throw new IllegalArgumentException("Unknown configuration item: " + key);
+    }
+
+    /** Provides a stable, grouped ordering for the admin UI. */
+    public static Comparator<ConfigItemDefinition> byKeyOrder() {
+        return Comparator.comparing(ConfigItemDefinition::key);
+    }
+
+    @Override
+    public String toString() {
+        return key + " (" + type.name().toLowerCase(Locale.ROOT) + ")";
+    }
+}
