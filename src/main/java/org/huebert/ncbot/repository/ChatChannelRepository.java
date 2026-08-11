@@ -50,6 +50,6 @@ public interface ChatChannelRepository extends JpaRepository<ChatChannel, Long> 
             WHERE c.id = :id
             """)
     @Modifying
-    void setMemoryUpdated(Long id, Instant instance);
+    void setMemoryUpdated(Long id, Instant instant);
 
 }
