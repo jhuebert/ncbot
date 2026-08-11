@@ -1,5 +1,6 @@
 package org.huebert.ncbot;
 
+import com.openai.core.Timeout;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.springframework.ai.openai.http.okhttp.OpenAiHttpClientBuilderCustomizer;
 import org.springframework.boot.SpringApplication;
@@ -20,16 +21,28 @@ public class NcbotApplication {
     }
 
     /**
-     * Apply a uniform request timeout to the OpenAI-compatible AI client.
+     * Apply a uniform timeout to the OpenAI-compatible AI client.
      *
      * Spring AI 2.x drives the model through the official OpenAI Java SDK
-     * (OkHttp), so the AI call's timeout is controlled here rather than via
+     * (OkHttp), so the AI call's timeouts are controlled here rather than via
      * a Spring RestClient. The value comes from {@code ncbot.ai-timeout}
      * (env {@code NCBOT_AI_TIMEOUT}, default 10m).
+     *
+     * {@code SpringAiOpenAiHttpClient.Builder#timeout(Duration)} only sets the
+     * top-level *request* (OkHttp call) timeout; connect/read/write stay at the
+     * SDK default of 60s. A slow local model that streams nothing for >60s would
+     * therefore be cut off regardless of {@code ai-timeout}. Set every timeout so
+     * the configured value actually takes effect.
      */
     @Bean
     public OpenAiHttpClientBuilderCustomizer aiHttpClientTimeoutCustomizer(NcbotProperties properties) {
-        return builder -> builder.timeout(properties.aiTimeout());
+        java.time.Duration timeout = properties.aiTimeout();
+        return builder -> builder.timeout(Timeout.builder()
+                .connect(timeout)
+                .read(timeout)
+                .write(timeout)
+                .request(timeout)
+                .build());
     }
 
 }
