@@ -2,37 +2,40 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Trash2, ChevronRight, Users, Hash } from "lucide-react";
 import { useChannels, useDeleteChannel } from "@/api/queries";
-import { useBooleanParam, usePageParam, useSearchQuery } from "@/lib/url-state";
+import { useBooleanParam, useSearchQuery } from "@/lib/url-state";
 import { PageState } from "@/components/page-state";
-import { Pagination } from "@/components/pagination";
+import { InfiniteScroll } from "@/components/infinite-scroll";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { SearchInput } from "@/components/search-input";
 import { Badge, Table, THead, Th, Td } from "@/components/ui/base";
 import { formatTimestamp, formatRelativeTime } from "@/lib/format";
 
-const PAGE_SIZE = 25;
-
 export function ChannelsPage() {
   const navigate = useNavigate();
-  const [page, setPage] = usePageParam("page", 0);
   const [dmFilter, setDmFilter] = useBooleanParam("dm");
   const [query, setQuery] = useSearchQuery();
 
-  const { data, isLoading, error, refetch } = useChannels({
-    page,
-    size: PAGE_SIZE,
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useChannels({
     ...(dmFilter !== undefined ? { dm: dmFilter } : {}),
     ...(query ? { query } : {}),
   });
+
+  const channels = data?.pages.flatMap((p) => p.content) ?? [];
+  const isEmpty = !isLoading && !error && channels.length === 0;
 
   const deleteMutation = useDeleteChannel();
   const [deleteTarget, setDeleteTarget] = useState<{
     id: number;
     name: string;
   } | null>(null);
-
-  const channels = data?.content ?? [];
-  const isEmpty = !isLoading && !error && channels.length === 0;
 
   return (
     <div>
@@ -71,6 +74,12 @@ export function ChannelsPage() {
           emptyText="No channels found."
           onRetry={() => refetch()}
         >
+          <InfiniteScroll
+            onLoadMore={() => fetchNextPage()}
+            hasMore={hasNextPage}
+            isLoadingMore={isFetchingNextPage}
+            className="max-h-[70vh] rounded-lg border border-gray-800"
+          >
           <Table>
             <THead>
               <Th>Name</Th>
@@ -135,17 +144,9 @@ export function ChannelsPage() {
               ))}
             </tbody>
           </Table>
+          </InfiniteScroll>
         </PageState>
       </div>
-
-      {data && (
-        <Pagination
-          currentPage={data.currentPage}
-          totalPages={data.totalPages}
-          totalElements={data.totalElements}
-          onPageChange={setPage}
-        />
-      )}
 
       <ConfirmDialog
         open={deleteTarget !== null}

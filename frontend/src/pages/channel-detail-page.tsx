@@ -11,13 +11,13 @@ import {
   useUpdateChannelMemory,
   useUpdateParticipantBlocked,
 } from "@/api/queries";
-import { usePageParam, useSearchQuery, useStringParam } from "@/lib/url-state";
+import { useSearchQuery, useStringParam } from "@/lib/url-state";
 import {
   ChannelDetailTabs,
   type ChannelTab,
 } from "@/components/channel-detail-tabs";
 import { PageState } from "@/components/page-state";
-import { Pagination } from "@/components/pagination";
+import { InfiniteScroll } from "@/components/infinite-scroll";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MemoryFormDialog } from "@/components/memory-form-dialog";
 import type { MemoryFormValues } from "@/components/memory-form-dialog";
@@ -26,11 +26,6 @@ import { Button, Table, THead, Th, Td, Badge } from "@/components/ui/base";
 import { formatTimestamp, truncate } from "@/lib/format";
 import { clsx } from "clsx";
 import type { MessageDto, MemoryDto } from "@/api/admin";
-
-const PAGE_SIZE = 25;
-// Fewer messages per page so the chat fits on screen without an internal
-// scrollbar; the page itself scrolls only in extreme cases.
-const MESSAGE_PAGE_SIZE = 12;
 
 // ── Chat helpers ──
 
@@ -136,64 +131,43 @@ export function ChannelDetailPage() {
 // ── Messages Tab (chat view) ──
 
 function MessagesTab({ channelId }: { channelId: number }) {
-  const [page, setPage] = usePageParam("page", 0);
-  const [sortDirection, setSortDirection] = useStringParam(
-    "sortDirection",
-    "DESC",
-  );
   const [before, setBefore] = useStringParam("before", "");
   const [after, setAfter] = useStringParam("after", "");
 
   const queryParams = {
-    page,
-    size: MESSAGE_PAGE_SIZE,
-    sortDirection: sortDirection as "ASC" | "DESC",
     ...(before ? { before: before + ":00Z" } : {}),
     ...(after ? { after: after + ":00Z" } : {}),
   };
 
-  const { data, isLoading, error, refetch } = useChannelMessages(
-    channelId,
-    queryParams,
-  );
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useChannelMessages(channelId, queryParams);
 
-  const messages = data?.messages ?? [];
+  // Pages arrive newest→oldest (page 0 is the most recent). Reverse so the
+  // newest message sits at the bottom, like a chat app; older messages load
+  // above as the user scrolls up.
+  const messages = useMemo(
+    () => (data?.pages.flatMap((p) => p.messages) ?? []).slice().reverse(),
+    [data],
+  );
+  const items = useMemo(() => toChatItems(messages), [messages]);
   const isEmpty = !isLoading && !error && messages.length === 0;
-
-  // Keep the newest message at the bottom of the page, like a messaging app.
-  const displayMessages = useMemo(
-    () => (sortDirection === "DESC" ? [...messages].reverse() : messages),
-    [messages, sortDirection],
-  );
-  const items = useMemo(() => toChatItems(displayMessages), [displayMessages]);
 
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5 text-sm text-gray-500">
-          Sort:
-          <select
-            value={sortDirection}
-            onChange={(e) => {
-              setSortDirection(e.target.value);
-              setPage(0);
-            }}
-            className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100"
-            aria-label="Sort direction"
-          >
-            <option value="DESC">Newest first</option>
-            <option value="ASC">Oldest first</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-1.5 text-sm text-gray-500">
           Before:
           <input
             type="datetime-local"
             value={before}
-            onChange={(e) => {
-              setBefore(e.target.value);
-              setPage(0);
-            }}
+            onChange={(e) => setBefore(e.target.value)}
             className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100"
           />
         </label>
@@ -202,10 +176,7 @@ function MessagesTab({ channelId }: { channelId: number }) {
           <input
             type="datetime-local"
             value={after}
-            onChange={(e) => {
-              setAfter(e.target.value);
-              setPage(0);
-            }}
+            onChange={(e) => setAfter(e.target.value)}
             className="rounded-md border border-gray-700 bg-gray-900 px-2 py-1 text-sm text-gray-100"
           />
         </label>
@@ -223,6 +194,15 @@ function MessagesTab({ channelId }: { channelId: number }) {
             Left: received · Right: ncbot response
           </div>
         )}
+        <InfiniteScroll
+          onLoadMore={() => fetchNextPage()}
+          hasMore={hasNextPage}
+          isLoadingMore={isFetchingNextPage}
+          sentinel="top"
+          scrollToBottomOnMount
+          loadingLabel="Loading older…"
+          className="max-h-[70vh] rounded-lg border border-gray-800"
+        >
         <div className="mx-auto max-w-3xl py-2">
           {items.map((item, i) => {
             const isSent = item.kind === "out";
@@ -268,19 +248,8 @@ function MessagesTab({ channelId }: { channelId: number }) {
             );
           })}
         </div>
+        </InfiniteScroll>
       </PageState>
-
-      {data && (
-        <div className="mx-auto max-w-3xl">
-          <Pagination
-            currentPage={data.currentPage}
-            totalPages={data.totalPages}
-            totalElements={data.totalElements}
-            pageSize={MESSAGE_PAGE_SIZE}
-            onPageChange={setPage}
-          />
-        </div>
-      )}
     </div>
   );
 }
@@ -288,25 +257,28 @@ function MessagesTab({ channelId }: { channelId: number }) {
 // ── Memory Tab ──
 
 function MemoryTab({ channelId }: { channelId: number }) {
-  const [page, setPage] = usePageParam("page", 0);
   const [query, setQuery] = useSearchQuery();
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<MemoryDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MemoryDto | null>(null);
   const [promoteTarget, setPromoteTarget] = useState<MemoryDto | null>(null);
 
-  const { data, isLoading, error, refetch } = useChannelMemory(channelId, {
-    page,
-    size: PAGE_SIZE,
-    ...(query ? { query } : {}),
-  });
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useChannelMemory(channelId, query ? { query } : {});
 
   const createMutation = useCreateChannelMemory(channelId);
   const updateMutation = useUpdateChannelMemory(channelId);
   const deleteMutation = useDeleteChannelMemory(channelId);
   const promoteMutation = usePromoteMemory(channelId);
 
-  const memories = data?.content ?? [];
+  const memories = data?.pages.flatMap((p) => p.content) ?? [];
   const isEmpty = !isLoading && !error && memories.length === 0;
 
   const handleSubmit = (values: MemoryFormValues) => {
@@ -353,6 +325,12 @@ function MemoryTab({ channelId }: { channelId: number }) {
         emptyText="No memories for this channel."
         onRetry={() => refetch()}
       >
+        <InfiniteScroll
+          onLoadMore={() => fetchNextPage()}
+          hasMore={hasNextPage}
+          isLoadingMore={isFetchingNextPage}
+          className="max-h-[70vh] rounded-lg border border-gray-800"
+        >
         <Table>
           <THead>
             <Th>Key</Th>
@@ -402,16 +380,8 @@ function MemoryTab({ channelId }: { channelId: number }) {
             ))}
           </tbody>
         </Table>
+        </InfiniteScroll>
       </PageState>
-
-      {data && (
-        <Pagination
-          currentPage={data.currentPage}
-          totalPages={data.totalPages}
-          totalElements={data.totalElements}
-          onPageChange={setPage}
-        />
-      )}
 
       <MemoryFormDialog
         open={formOpen}
@@ -466,21 +436,21 @@ function MemoryTab({ channelId }: { channelId: number }) {
 // ── Participants Tab ──
 
 function ParticipantsTab({ channelId }: { channelId: number }) {
-  const [page, setPage] = usePageParam("page", 0);
   const [query, setQuery] = useSearchQuery();
 
-  const { data, isLoading, error, refetch } = useChannelParticipants(
-    channelId,
-    {
-      page,
-      size: PAGE_SIZE,
-      ...(query ? { query } : {}),
-    },
-  );
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useChannelParticipants(channelId, query ? { query } : {});
 
   const updateBlocked = useUpdateParticipantBlocked();
 
-  const participants = data?.content ?? [];
+  const participants = data?.pages.flatMap((p) => p.content) ?? [];
   const isEmpty = !isLoading && !error && participants.length === 0;
 
   return (
@@ -504,6 +474,12 @@ function ParticipantsTab({ channelId }: { channelId: number }) {
         emptyText="No participants found for this channel."
         onRetry={() => refetch()}
       >
+        <InfiniteScroll
+          onLoadMore={() => fetchNextPage()}
+          hasMore={hasNextPage}
+          isLoadingMore={isFetchingNextPage}
+          className="max-h-[70vh] rounded-lg border border-gray-800"
+        >
         <Table>
           <THead>
             <Th>Name</Th>
@@ -568,16 +544,8 @@ function ParticipantsTab({ channelId }: { channelId: number }) {
             ))}
           </tbody>
         </Table>
+        </InfiniteScroll>
       </PageState>
-
-      {data && (
-        <Pagination
-          currentPage={data.currentPage}
-          totalPages={data.totalPages}
-          totalElements={data.totalElements}
-          onPageChange={setPage}
-        />
-      )}
     </div>
   );
 }

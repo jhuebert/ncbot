@@ -65,7 +65,7 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             SELECT m
             FROM ChatMessage m
             WHERE m.chatChannelId = :chatChannelId AND m.createdAt > :after
-            ORDER BY m.createdAt ASC
+            ORDER BY m.createdAt DESC
             """)
     Page<ChatMessage> findMessagesByChannelAfter(Long chatChannelId, Instant after, Pageable pageable);
 

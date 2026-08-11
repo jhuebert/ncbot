@@ -1,26 +1,27 @@
 import { useAllParticipants, useUpdateParticipantBlocked } from "@/api/queries";
-import { usePageParam, useSearchQuery } from "@/lib/url-state";
+import { useSearchQuery } from "@/lib/url-state";
 import { PageState } from "@/components/page-state";
-import { Pagination } from "@/components/pagination";
+import { InfiniteScroll } from "@/components/infinite-scroll";
 import { SearchInput } from "@/components/search-input";
 import { Table, THead, Th, Td, Badge, Button } from "@/components/ui/base";
 import { formatTimestamp, formatRelativeTime } from "@/lib/format";
 
-const PAGE_SIZE = 25;
-
 export function ParticipantsPage() {
-  const [page, setPage] = usePageParam("page", 0);
   const [query, setQuery] = useSearchQuery();
 
-  const { data, isLoading, error, refetch } = useAllParticipants({
-    page,
-    size: PAGE_SIZE,
-    ...(query ? { query } : {}),
-  });
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useAllParticipants(query ? { query } : {});
 
   const updateBlocked = useUpdateParticipantBlocked();
 
-  const participants = data?.content ?? [];
+  const participants = data?.pages.flatMap((p) => p.content) ?? [];
   const isEmpty = !isLoading && !error && participants.length === 0;
 
   return (
@@ -43,6 +44,12 @@ export function ParticipantsPage() {
           emptyText="No participants found."
           onRetry={() => refetch()}
         >
+          <InfiniteScroll
+            onLoadMore={() => fetchNextPage()}
+            hasMore={hasNextPage}
+            isLoadingMore={isFetchingNextPage}
+            className="max-h-[70vh] rounded-lg border border-gray-800"
+          >
           <Table>
             <THead>
               <Th>Name</Th>
@@ -111,17 +118,9 @@ export function ParticipantsPage() {
               ))}
             </tbody>
           </Table>
+          </InfiniteScroll>
         </PageState>
       </div>
-
-      {data && (
-        <Pagination
-          currentPage={data.currentPage}
-          totalPages={data.totalPages}
-          totalElements={data.totalElements}
-          onPageChange={setPage}
-        />
-      )}
     </div>
   );
 }

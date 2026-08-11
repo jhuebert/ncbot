@@ -1,4 +1,9 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  useInfiniteQuery,
+} from "@tanstack/react-query";
 import {
   fetchChannels,
   deleteChannel,
@@ -23,49 +28,55 @@ import { toast } from "sonner";
 
 // ── Query Keys ──
 
+// List / page size used for infinite-scroll lists.
+const LIST_PAGE_SIZE = 25;
+// Fewer messages per page so the chat fits on screen; scrolling up loads more.
+const MESSAGE_PAGE_SIZE = 12;
+
+/**
+ * React Query resolves the next page number from the last server response.
+ * The API reports the current page and total pages; when `currentPage + 1`
+ * is still within range we request that page next.
+ */
+function nextPageParam<T extends { currentPage: number; totalPages: number }>(
+  lastPage: T,
+): number | undefined {
+  return lastPage.currentPage + 1 < lastPage.totalPages
+    ? lastPage.currentPage + 1
+    : undefined;
+}
+
 export const queryKeys = {
   channels: {
     all: ["channels"] as const,
-    list: (params?: {
-      dm?: boolean;
-      query?: string;
-      page?: number;
-      size?: number;
-    }) => ["channels", "list", params] as const,
+    list: (params?: { dm?: boolean; query?: string }) =>
+      ["channels", "list", params] as const,
   },
   messages: {
     byChannel: (
       channelId: number,
-      params?: {
-        before?: string;
-        after?: string;
-        page?: number;
-        size?: number;
-        sortDirection?: "ASC" | "DESC";
-      },
+      params?: { before?: string; after?: string },
     ) => ["messages", channelId, params] as const,
   },
   channelMemory: {
     byChannel: (
       channelId: number,
-      params?: { query?: string; page?: number; size?: number },
+      params?: { query?: string },
     ) => ["channelMemory", channelId, params] as const,
   },
   channelParticipants: {
     all: ["channelParticipants"] as const,
-    byChannel: (
-      channelId: number,
-      params?: { query?: string; page?: number; size?: number },
-    ) => ["channelParticipants", channelId, params] as const,
+    byChannel: (channelId: number, params?: { query?: string }) =>
+      ["channelParticipants", channelId, params] as const,
   },
   globalMemory: {
     all: ["globalMemory"] as const,
-    list: (params?: { query?: string; page?: number; size?: number }) =>
+    list: (params?: { query?: string }) =>
       ["globalMemory", "list", params] as const,
   },
   participants: {
     all: ["participants"] as const,
-    list: (params?: { query?: string; page?: number; size?: number }) =>
+    list: (params?: { query?: string }) =>
       ["participants", "list", params] as const,
   },
   config: {
@@ -75,15 +86,13 @@ export const queryKeys = {
 
 // ── Channels ──
 
-export function useChannels(params?: {
-  dm?: boolean;
-  query?: string;
-  page?: number;
-  size?: number;
-}) {
-  return useQuery({
+export function useChannels(params?: { dm?: boolean; query?: string }) {
+  return useInfiniteQuery({
     queryKey: queryKeys.channels.list(params),
-    queryFn: () => fetchChannels(params),
+    queryFn: ({ pageParam = 0 }) =>
+      fetchChannels({ ...params, page: pageParam, size: LIST_PAGE_SIZE }),
+    initialPageParam: 0,
+    getNextPageParam: nextPageParam,
   });
 }
 
@@ -103,19 +112,26 @@ export function useDeleteChannel() {
 
 // ── Messages ──
 
+/**
+ * Channel messages are loaded newest-first (page 0 is the most recent batch)
+ * and older pages are fetched as the user scrolls up. The UI reverses the
+ * flattened result so the newest message sits at the bottom, chat-style.
+ */
 export function useChannelMessages(
   channelId: number,
-  params?: {
-    before?: string;
-    after?: string;
-    page?: number;
-    size?: number;
-    sortDirection?: "ASC" | "DESC";
-  },
+  params?: { before?: string; after?: string },
 ) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: queryKeys.messages.byChannel(channelId, params),
-    queryFn: () => fetchChannelMessages(channelId, params),
+    queryFn: ({ pageParam = 0 }) =>
+      fetchChannelMessages(channelId, {
+        ...params,
+        page: pageParam,
+        size: MESSAGE_PAGE_SIZE,
+        sortDirection: "DESC",
+      }),
+    initialPageParam: 0,
+    getNextPageParam: nextPageParam,
   });
 }
 
@@ -123,11 +139,18 @@ export function useChannelMessages(
 
 export function useChannelMemory(
   channelId: number,
-  params?: { query?: string; page?: number; size?: number },
+  params?: { query?: string },
 ) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: queryKeys.channelMemory.byChannel(channelId, params),
-    queryFn: () => fetchChannelMemory(channelId, params),
+    queryFn: ({ pageParam = 0 }) =>
+      fetchChannelMemory(channelId, {
+        ...params,
+        page: pageParam,
+        size: LIST_PAGE_SIZE,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: nextPageParam,
   });
 }
 
@@ -138,7 +161,7 @@ export function useCreateChannelMemory(channelId: number) {
       createChannelMemory(channelId, body),
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: queryKeys.channelMemory.byChannel(channelId),
+        queryKey: ["channelMemory", channelId],
       });
       toast.success("Memory created");
     },
@@ -160,7 +183,7 @@ export function useUpdateChannelMemory(channelId: number) {
     }) => updateChannelMemory(channelId, id, body),
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: queryKeys.channelMemory.byChannel(channelId),
+        queryKey: ["channelMemory", channelId],
       });
       toast.success("Memory updated");
     },
@@ -176,7 +199,7 @@ export function useDeleteChannelMemory(channelId: number) {
     mutationFn: (id: number) => deleteChannelMemory(channelId, id),
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: queryKeys.channelMemory.byChannel(channelId),
+        queryKey: ["channelMemory", channelId],
       });
       toast.success("Memory deleted");
     },
@@ -192,7 +215,7 @@ export function usePromoteMemory(channelId: number) {
     mutationFn: (id: number) => promoteMemory(channelId, id),
     onSuccess: () => {
       qc.invalidateQueries({
-        queryKey: queryKeys.channelMemory.byChannel(channelId),
+        queryKey: ["channelMemory", channelId],
       });
       qc.invalidateQueries({ queryKey: queryKeys.globalMemory.all });
       toast.success("Memory promoted to global");
@@ -207,24 +230,30 @@ export function usePromoteMemory(channelId: number) {
 
 export function useChannelParticipants(
   channelId: number,
-  params?: { query?: string; page?: number; size?: number },
+  params?: { query?: string },
 ) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: queryKeys.channelParticipants.byChannel(channelId, params),
-    queryFn: () => fetchChannelParticipants(channelId, params),
+    queryFn: ({ pageParam = 0 }) =>
+      fetchChannelParticipants(channelId, {
+        ...params,
+        page: pageParam,
+        size: LIST_PAGE_SIZE,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: nextPageParam,
   });
 }
 
 // ── Global Memory ──
 
-export function useGlobalMemory(params?: {
-  query?: string;
-  page?: number;
-  size?: number;
-}) {
-  return useQuery({
+export function useGlobalMemory(params?: { query?: string }) {
+  return useInfiniteQuery({
     queryKey: queryKeys.globalMemory.list(params),
-    queryFn: () => fetchGlobalMemory(params),
+    queryFn: ({ pageParam = 0 }) =>
+      fetchGlobalMemory({ ...params, page: pageParam, size: LIST_PAGE_SIZE }),
+    initialPageParam: 0,
+    getNextPageParam: nextPageParam,
   });
 }
 
@@ -279,14 +308,17 @@ export function useDeleteGlobalMemory() {
 
 // ── Participants ──
 
-export function useAllParticipants(params?: {
-  query?: string;
-  page?: number;
-  size?: number;
-}) {
-  return useQuery({
+export function useAllParticipants(params?: { query?: string }) {
+  return useInfiniteQuery({
     queryKey: queryKeys.participants.list(params),
-    queryFn: () => fetchAllParticipants(params),
+    queryFn: ({ pageParam = 0 }) =>
+      fetchAllParticipants({
+        ...params,
+        page: pageParam,
+        size: LIST_PAGE_SIZE,
+      }),
+    initialPageParam: 0,
+    getNextPageParam: nextPageParam,
   });
 }
 

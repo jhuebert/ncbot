@@ -6,9 +6,9 @@ import {
   useUpdateGlobalMemory,
   useDeleteGlobalMemory,
 } from "@/api/queries";
-import { usePageParam, useSearchQuery } from "@/lib/url-state";
+import { useSearchQuery } from "@/lib/url-state";
 import { PageState } from "@/components/page-state";
-import { Pagination } from "@/components/pagination";
+import { InfiniteScroll } from "@/components/infinite-scroll";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MemoryFormDialog } from "@/components/memory-form-dialog";
 import type { MemoryFormValues } from "@/components/memory-form-dialog";
@@ -17,26 +17,27 @@ import { Button, Table, THead, Th, Td } from "@/components/ui/base";
 import { truncate } from "@/lib/format";
 import type { MemoryDto } from "@/api/admin";
 
-const PAGE_SIZE = 25;
-
 export function GlobalMemoryPage() {
-  const [page, setPage] = usePageParam("page", 0);
   const [query, setQuery] = useSearchQuery();
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<MemoryDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MemoryDto | null>(null);
 
-  const { data, isLoading, error, refetch } = useGlobalMemory({
-    page,
-    size: PAGE_SIZE,
-    ...(query ? { query } : {}),
-  });
+  const {
+    data,
+    isLoading,
+    error,
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useGlobalMemory(query ? { query } : {});
 
   const createMutation = useCreateGlobalMemory();
   const updateMutation = useUpdateGlobalMemory();
   const deleteMutation = useDeleteGlobalMemory();
 
-  const memories = data?.content ?? [];
+  const memories = data?.pages.flatMap((p) => p.content) ?? [];
   const isEmpty = !isLoading && !error && memories.length === 0;
 
   const handleSubmit = (values: MemoryFormValues) => {
@@ -82,6 +83,12 @@ export function GlobalMemoryPage() {
           emptyText="No global memories yet."
           onRetry={() => refetch()}
         >
+          <InfiniteScroll
+            onLoadMore={() => fetchNextPage()}
+            hasMore={hasNextPage}
+            isLoadingMore={isFetchingNextPage}
+            className="max-h-[70vh] rounded-lg border border-gray-800"
+          >
           <Table>
             <THead>
               <Th>Key</Th>
@@ -124,17 +131,9 @@ export function GlobalMemoryPage() {
               ))}
             </tbody>
           </Table>
+          </InfiniteScroll>
         </PageState>
       </div>
-
-      {data && (
-        <Pagination
-          currentPage={data.currentPage}
-          totalPages={data.totalPages}
-          totalElements={data.totalElements}
-          onPageChange={setPage}
-        />
-      )}
 
       <MemoryFormDialog
         open={formOpen}
