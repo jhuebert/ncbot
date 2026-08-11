@@ -20,7 +20,7 @@ flowchart TD
         PU --> CMD["CommandChatHandler"]
         CMD --> AIH["AiChatHandler"]
         AIH --> AIS["AI Chat Service (Spring AI)"]
-        AIS -->|Tools| T1["getCurrentWeather"]
+        AIS -->|Tools| T1["getWeather"]
         CS --> REPO["Repositories (JPA + SQLite)"]
         REPO --> CM["ChatMessage"]
         REPO --> CHAN["ChatChannel"]
@@ -214,6 +214,7 @@ ncbot maintains long-term memory per channel using AI-generated key-value pairs.
 - **Condensing**: When an AI response exceeds the byte limit, a second AI call condenses it to fit
 - **Partitions**: Memory updates process messages in configurable batches
 - **Storage**: Memories are stored in the `chat_memory` table, scoped to each channel
+- **Resilience**: Each channel's synthesis is run independently, so a transient AI failure (e.g. a provider timeout/stream reset) on one channel doesn't abort updates for the others; the failing channel is retried on the next cycle. The memory-synthesis AI call itself retries up to 3 times per partition.
 
 ### Tools
 
@@ -221,7 +222,7 @@ The AI model has access to these tools:
 
 | Tool | Description |
 |------|-------------|
-| `getCurrentWeather` | Get current weather by latitude/longitude (via Open-Meteo). Returns temperature (°F), wind speed (mph), wind direction (°), humidity (%), and conditions. Bounded by `NCBOT_WEATHER_TIMEOUT` (default 10 s) so a hung lookup can't stall the AI call. |
+| `getWeather` | Get current weather **and** the 7-day forecast for a location (via Open-Meteo). Returns location/time zone, current observations (temperature, feels-like, wind speed, gusts, wind direction, humidity, precipitation, cloud cover, pressure, conditions) and a per-day forecast (high/low, conditions, precipitation chance, UV index, sunrise/sunset). Bounded by `NCBOT_WEATHER_TIMEOUT` (default 10 s) so a hung lookup can't stall the AI call. |
 
 The tool/param descriptions tell the model to estimate coordinates from a location name and to judge freshness: chat history carries per-message ages (e.g. `[2h ago]`, rendered in `__CHAT_MESSAGES__` alongside the current `Time:` line), so a time-sensitive claim like weather older than ~15 minutes is treated as stale and triggers a fresh tool call, while fresh data avoids one.
 

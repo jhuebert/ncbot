@@ -52,7 +52,7 @@ org.huebert.ncbot/
 │       ├── ChannelsChatHandler, HelpChatHandler, PathChatHandler
 │       ├── DiceChatHandler, PingChatHandler, RandomChatHandler, TestChatHandler, UsersChatHandler
 ├── tool/                          # AI tools (@Component + @Tool)
-│   └── WeatherTool.java           # getCurrentWeather
+│   └── WeatherTool.java           # getWeather
 ├── entity/                        # JPA entities (Lombok)
 │   ├── ChatChannel, ChatMemory, ChatMessage, ChatParticipant
 ├── repository/                    # JPA repositories
@@ -157,6 +157,8 @@ In addition to the `block-user` regex, individual participants can be blocked di
 - `MemoryService` runs on a schedule (`NCBOT_MEMORY_UPDATE_PERIOD`, default 30m)
 - Reads message partitions (`NCBOT_MEMORY_PARTITION_SIZE`, default 100)
 - Sends them to AI for key-value memory synthesis
+- Each channel is synthesized independently (one channel's AI failure doesn't abort others)
+- The memory-synthesis AI call retries up to 3 times per partition for transient provider failures
 - Memories are included in every AI chat prompt as `CHAT_MEMORY`
 - Memory keys use dot-separated namespaces: `user.*`, `channel.*`, `bot.*`
 

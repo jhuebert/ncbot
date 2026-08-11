@@ -31,6 +31,13 @@ public class MemoryService {
 
     private static final String DELETE_VALUE = "__DELETE__";
 
+    /**
+     * Number of attempts for the memory-synthesis AI call. Transient provider resets
+     * (e.g. an HTTP/2 stream CANCEL or a brief timeout) can abort a call, so retry a
+     * couple of times before giving up on a partition.
+     */
+    private static final int MEMORY_CALL_ATTEMPTS = 3;
+
     private final NcbotProperties ncbotProperties;
     private final ChatClient chatClient;
     private final TemplateService templateService;
@@ -165,28 +172,40 @@ public class MemoryService {
         Instant now = Instant.now();
 
         for (ChatChannel channel : channelService.findAll()) {
-            log.debug("channel: {}", channel);
-
-            if (!channel.getIsDm()) {
-                ChannelCapabilities caps = ncbotProperties.getChannelCapabilities(channel.getChannelName());
-                if (caps.ai() == AiMode.DISABLED) {
-                    log.debug("ai disabled for channel {}, skipping", channel.getChannelName());
-                    continue;
-                }
+            try {
+                updateChannel(channel, now);
+            } catch (RuntimeException e) {
+                // Isolate failures: one channel's AI timeout must not abort memory
+                // updates for the remaining channels. The channel is left un-marked as
+                // updated, so it will be retried on the next scheduled run.
+                log.error("memory update failed for channel {} ({}); will retry next cycle: {}",
+                        channel.getId(), channel.getChannelName(), e.getMessage(), e);
             }
-
-            List<ChatMessage> messages = messageService.findChannelMessages(channel.getId(), channel.getMemoryUpdatedAt(), now);
-            log.debug("messages count: {}", messages.size());
-            if (messages.isEmpty()) {
-                continue;
-            }
-
-            for (List<ChatMessage> partition : Lists.partition(messages, ncbotProperties.memoryPartitionSize())) {
-                updateMemory(channel, partition);
-            }
-
-            channelService.setMemoryUpdated(channel.getId());
         }
+    }
+
+    private void updateChannel(ChatChannel channel, Instant now) {
+        log.debug("channel: {}", channel);
+
+        if (!channel.getIsDm()) {
+            ChannelCapabilities caps = ncbotProperties.getChannelCapabilities(channel.getChannelName());
+            if (caps.ai() == AiMode.DISABLED) {
+                log.debug("ai disabled for channel {}, skipping", channel.getChannelName());
+                return;
+            }
+        }
+
+        List<ChatMessage> messages = messageService.findChannelMessages(channel.getId(), channel.getMemoryUpdatedAt(), now);
+        log.debug("messages count: {}", messages.size());
+        if (messages.isEmpty()) {
+            return;
+        }
+
+        for (List<ChatMessage> partition : Lists.partition(messages, ncbotProperties.memoryPartitionSize())) {
+            updateMemory(channel, partition);
+        }
+
+        channelService.setMemoryUpdated(channel.getId());
     }
 
     private void updateMemory(ChatChannel channel, List<ChatMessage> messages) {
@@ -232,11 +251,7 @@ public class MemoryService {
         ));
         log.debug("getUpdates: user={}", user);
 
-        String response = chatClient.prompt()
-                .system(ncbotProperties.memoryPrompt())
-                .user(user)
-                .call()
-                .content();
+        String response = callMemory(user);
 
         if ("EMPTY".equalsIgnoreCase(Strings.trimToNull(response))) {
             log.debug("getUpdates result: EMPTY");
@@ -254,6 +269,29 @@ public class MemoryService {
 
         log.debug("getUpdates result: {}", result);
         return result;
+    }
+
+    /**
+     * Run the memory-synthesis AI call with a small bounded retry. Transient provider
+     * errors (timeouts, stream resets) can fail a single attempt; retrying makes a partial
+     * failure less likely to silently drop an entire partition of messages.
+     */
+    private String callMemory(String user) {
+        RuntimeException last = null;
+        for (int attempt = 1; attempt <= MEMORY_CALL_ATTEMPTS; attempt++) {
+            try {
+                return chatClient.prompt()
+                        .system(ncbotProperties.memoryPrompt())
+                        .user(user)
+                        .call()
+                        .content();
+            } catch (RuntimeException e) {
+                last = e;
+                log.warn("memory synthesis AI call failed (attempt {}/{}): {}",
+                        attempt, MEMORY_CALL_ATTEMPTS, e.getMessage());
+            }
+        }
+        throw last;
     }
 
 }
