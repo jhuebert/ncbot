@@ -106,8 +106,8 @@ export function ChannelDetailPage() {
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-4 flex items-center gap-3">
+    <div className="flex h-[calc(100dvh-5.5rem)] flex-col md:h-[calc(100dvh-6.5rem)]">
+      <div className="mb-4 flex shrink-0 items-center gap-3">
         <Button
           variant="ghost"
           size="sm"
@@ -117,16 +117,13 @@ export function ChannelDetailPage() {
           <ArrowLeft className="h-4 w-4" />
         </Button>
         <h1 className="text-2xl font-bold text-gray-100">
-          Channel #{id}
-          {channel?.channelName && channel.channelName !== "#" + id && (
-            <span className="ml-3 align-middle text-lg font-semibold text-gray-400">
-              {channel.channelName}
-            </span>
-          )}
+          {channel?.channelName ?? `Channel #${id}`}
         </h1>
       </div>
 
-      <ChannelDetailTabs activeTab={currentTab} onChange={(t) => setTab(t)} />
+      <div className="shrink-0">
+        <ChannelDetailTabs activeTab={currentTab} onChange={(t) => setTab(t)} />
+      </div>
 
       <div className="mt-4 flex min-h-0 flex-1 flex-col">
         {currentTab === "messages" && <MessagesTab channelId={id} />}
