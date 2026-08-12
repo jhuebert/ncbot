@@ -2,17 +2,23 @@ package org.huebert.ncbot.service;
 
 import com.google.common.collect.Lists;
 import lombok.extern.slf4j.Slf4j;
-import org.apache.logging.log4j.util.Strings;
 import org.huebert.ncbot.config.AiMode;
 import org.huebert.ncbot.config.ChannelCapabilities;
+import org.huebert.ncbot.dto.PromptMessage;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatMemory;
+import org.huebert.ncbot.entity.ChatMemoryFailure;
 import org.huebert.ncbot.entity.ChatMessage;
-import org.huebert.ncbot.dto.PromptMessage;
+import org.huebert.ncbot.controller.dto.MemoryFailureDto;
 import org.huebert.ncbot.repository.ChatMemory2Repository;
+import org.huebert.ncbot.repository.ChatMemoryFailureRepository;
+import org.huebert.ncbot.tool.MemoryTool;
 import org.huebert.ncbot.util.DebugLog;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.chat.model.Generation;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -20,16 +26,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 public class MemoryService {
-
-    private static final String DELETE_VALUE = "__DELETE__";
 
     /**
      * Number of attempts for the memory-synthesis AI call. Transient provider resets
@@ -38,28 +42,47 @@ public class MemoryService {
      */
     private static final int MEMORY_CALL_ATTEMPTS = 3;
 
+    /** OpenAI finish reason emitted when provider content moderation refuses a prompt. */
+    private static final String FINISH_REASON_CONTENT_FILTER = "content_filter";
+
+    private static final int FAILURE_ERROR_MAX_LENGTH = 2000;
+
     private final ConfigService configService;
     private final ChatClient chatClient;
     private final TemplateService templateService;
     private final ChannelService channelService;
     private final MessageService messageService;
     private final ChatMemory2Repository chatMemoryRepository;
+    private final ChatMemoryFailureRepository chatMemoryFailureRepository;
+    private final MemoryTool memoryTool;
+
+    /**
+     * Consecutive failed synthesis runs per channel. A partition that fails this many times
+     * in a row is skipped (cursor advanced past it) so a deterministically failing batch —
+     * e.g. provider content moderation on a batch of messages — cannot wedge the channel by
+     * being retried forever.
+     */
+    private final Map<Long, Integer> consecutiveFailures = new ConcurrentHashMap<>();
 
     public MemoryService(
             ConfigService configService,
             ChatModel chatModel,
             ChatMemory2Repository chatMemoryRepository,
+            ChatMemoryFailureRepository chatMemoryFailureRepository,
             TemplateService templateService,
             ChannelService channelService,
-            MessageService messageService
+            MessageService messageService,
+            MemoryTool memoryTool
     ) {
         this.configService = configService;
         this.chatMemoryRepository = chatMemoryRepository;
+        this.chatMemoryFailureRepository = chatMemoryFailureRepository;
         this.templateService = templateService;
         this.chatClient = ChatClient.builder(chatModel)
                 .build();
         this.channelService = channelService;
         this.messageService = messageService;
+        this.memoryTool = memoryTool;
     }
 
     // ── CRUD operations ──────────────────────────────────────────────
@@ -78,6 +101,46 @@ public class MemoryService {
         return q == null
                 ? chatMemoryRepository.findGlobalMemory(pageable)
                 : chatMemoryRepository.searchGlobalMemory(q, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MemoryFailureDto> findRecentFailures(Pageable pageable) {
+        Map<Long, String> channelNames = channelService.findAll().stream()
+                .collect(Collectors.toMap(ChatChannel::getId, ChatChannel::getChannelName, (a, b) -> a));
+        return chatMemoryFailureRepository.findAllByOrderByCreatedAtDesc(pageable)
+                .map(f -> MemoryFailureDto.from(f, channelNames.get(f.getChatChannelId())));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<MemoryFailureDto> findChannelFailures(Long channelId, Pageable pageable) {
+        String channelName = channelService.getChannel(channelId).channelName();
+        return chatMemoryFailureRepository.findAllByChatChannelIdOrderByCreatedAtDesc(channelId, pageable)
+                .map(f -> MemoryFailureDto.from(f, channelName));
+    }
+
+    /**
+     * Re-process a skipped batch: rewind the channel's memory cursor to just before the
+     * first message of the failed partition and clear the failure record so the next
+     * scheduled run synthesizes it again. The retry succeeds even if the batch fails
+     * again — it simply re-records a failure — so an admin can iterate until the cause
+     * (e.g. a prompt change) is resolved.
+     */
+    @Transactional
+    public void retryFailure(Long id) {
+        ChatMemoryFailure failure = chatMemoryFailureRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Memory failure not found: " + id));
+        Long fromMessageId = failure.getFromMessageId();
+        Instant fromCreatedAt = fromMessageId == null
+                ? null
+                : messageService.findCreatedAt(fromMessageId).orElse(null);
+        if (fromCreatedAt == null) {
+            throw new IllegalArgumentException(
+                    "Cannot retry: the originating message (id " + fromMessageId + ") no longer exists");
+        }
+        // Cursor must be strictly before the first message so createdAt > cursor includes it.
+        channelService.setMemoryUpdated(failure.getChatChannelId(), fromCreatedAt.minusNanos(1));
+        consecutiveFailures.remove(failure.getChatChannelId());
+        chatMemoryFailureRepository.delete(failure);
     }
 
     @Transactional
@@ -176,9 +239,9 @@ public class MemoryService {
                 updateChannel(channel, now);
             } catch (RuntimeException e) {
                 // Isolate failures: one channel's AI timeout must not abort memory
-                // updates for the remaining channels. Completed partitions were already
-                // marked as updated, so the next scheduled run resumes from the failed
-                // partition instead of reprocessing the whole channel.
+                // updates for the remaining channels. The failing channel's cursor was
+                // already advanced past every successful partition, so the next run
+                // resumes from the failed partition instead of reprocessing the channel.
                 log.error("memory update failed for channel {} ({}); will resume from last successful partition next cycle: {}",
                         channel.getId(), channel.getChannelName(), e.getMessage(), e);
             }
@@ -196,7 +259,8 @@ public class MemoryService {
             }
         }
 
-        List<ChatMessage> messages = messageService.findChannelMessages(channel.getId(), channel.getMemoryUpdatedAt(), now);
+        List<ChatMessage> messages = messageService.findChannelMessages(
+                channel.getId(), channel.getMemoryUpdatedAt(), now);
         log.debug("messages count: {}", messages.size());
         if (messages.isEmpty()) {
             return;
@@ -204,92 +268,70 @@ public class MemoryService {
 
         List<List<ChatMessage>> partitions = Lists.partition(messages, configService.memoryPartitionSize());
         for (List<ChatMessage> partition : partitions) {
-            // Advance the cursor to this partition's last message as soon as it succeeds. If a
-            // later partition fails, only the failed partition onward is re-processed on the next
-            // cycle instead of re-running memory synthesis over every already-done partition.
-            Instant cursor = partition.get(partition.size() - 1).getCreatedAt();
-            updateMemory(channel, partition);
+            Instant cursor = partition.getLast().getCreatedAt();
+            Long fromId = partition.getFirst().getId();
+            Long toId = partition.getLast().getId();
+            try {
+                updateMemory(channel, partition);
+                consecutiveFailures.remove(channel.getId());
+            } catch (RuntimeException e) {
+                int failures = consecutiveFailures.merge(channel.getId(), 1, Integer::sum);
+                if (failures < configService.memoryMaxFailures()) {
+                    // Leave the cursor untouched so the same partition is retried next cycle.
+                    log.warn("memory synthesis failed for channel {} ({}), partition msgs {}..{} (failure {}/{}); will retry next cycle: {}",
+                            channel.getId(), channel.getChannelName(), fromId, toId,
+                            failures, configService.memoryMaxFailures(), e.getMessage());
+                    throw e;
+                }
+                // Poison partition: the AI call deterministically fails for this batch (e.g.
+                // provider content moderation on the messages). Advance the cursor past it so
+                // the channel is not stuck retrying the same batch forever, and record the skip.
+                consecutiveFailures.remove(channel.getId());
+                log.error("memory synthesis failed {} consecutive times for channel {} ({}); SKIPPING partition msgs {}..{} to avoid endless retries: {}",
+                        configService.memoryMaxFailures(), channel.getId(), channel.getChannelName(),
+                        fromId, toId, e.getMessage(), e);
+                recordFailure(channel.getId(), fromId, toId, e.getMessage());
+            }
+            // Success (or a poisoned skip) advances the cursor; the retry path above does not.
             channelService.setMemoryUpdated(channel.getId(), cursor);
         }
     }
 
     private void updateMemory(ChatChannel channel, List<ChatMessage> messages) {
-        log.debug("updateMemory: channel={}, messages size={}", channel, messages.size());
+        log.debug("updateMemory: channel={}, messages size={}", channel.getId(), messages.size());
 
-        Map<String, ChatMemory> memories = chatMemoryRepository.findMemory(channel.getId()).stream()
-                .collect(Collectors.toMap(ChatMemory::getKey, a -> a));
-        log.debug("memories count: {}", memories.size());
-
-        for (Map.Entry<String, String> entry : getUpdates(memories, messages).entrySet()) {
-            ChatMemory memory = memories.get(entry.getKey());
-            if (memory == null) {
-                if (!DELETE_VALUE.equals(entry.getValue())) {
-                    // Added
-                    log.debug("adding memory: {}", entry);
-                    chatMemoryRepository.save(ChatMemory.builder()
-                            .chatChannelId(channel.getId())
-                            .key(entry.getKey())
-                            .value(entry.getValue())
-                            .build());
-                }
-            } else if (memory.getChatChannelId() != null) {
-                if (DELETE_VALUE.equals(entry.getValue())) {
-                    // Deleted
-                    log.debug("deleting memory: {}", entry);
-                    chatMemoryRepository.delete(memory);
-                } else {
-                    // Updated
-                    log.debug("updating memory: {}", entry);
-                    memory.setValue(entry.getValue());
-                    chatMemoryRepository.save(memory);
-                }
-            }
-        }
-    }
-
-    private Map<String, String> getUpdates(Map<String, ChatMemory> existingMemories, List<ChatMessage> messages) {
-        log.debug("getUpdates: memories size={}, messages size={}", existingMemories.size(), messages.size());
-
-        String user = templateService.render("memory", Map.of(
-                "memories", existingMemories.values(),
+        // Existing channel+global memories are rendered inline (__CHAT_MEMORY__) so the model
+        // does not need a guaranteed get-* tool call; it persists changes directly through the
+        // MemoryTool, so the returned text is ignored and no parsing is needed.
+        List<ChatMemory> memories = chatMemoryRepository.findMemory(channel.getId());
+        callMemory(templateService.render("memory", Map.of(
+                "channelId", channel.getId(),
+                "memories", memories,
                 "messages", messages.stream().map(PromptMessage::from).collect(Collectors.toList())
-        ));
-        log.debug("getUpdates: user={}", user);
-
-        String response = callMemory(user);
-
-        if ("EMPTY".equalsIgnoreCase(Strings.trimToNull(response))) {
-            log.debug("getUpdates result: EMPTY");
-            return Map.of();
-        }
-
-        Map<String, String> result = new HashMap<>();
-        for (String line : response.split("\n")) {
-            if (!line.contains("=")) {
-                continue;
-            }
-            String[] values = line.split("=");
-            result.put(values[0].trim(), values[1].trim());
-        }
-
-        log.debug("getUpdates result: {}", result);
-        return result;
+        )));
     }
 
     /**
-     * Run the memory-synthesis AI call with a small bounded retry. Transient provider
-     * errors (timeouts, stream resets) can fail a single attempt; retrying makes a partial
-     * failure less likely to silently drop an entire partition of messages.
+     * Run the memory-synthesis AI call with a small bounded retry. The model makes
+     * {@link MemoryTool} calls that write channel memory directly. A provider
+     * content-moderation refusal (OpenAI finish_reason=content_filter) is treated as a
+     * failure so the poison logic can skip the batch instead of silently dropping it.
      */
-    private String callMemory(String user) {
+    private void callMemory(String user) {
         RuntimeException last = null;
         for (int attempt = 1; attempt <= MEMORY_CALL_ATTEMPTS; attempt++) {
             try {
-                return chatClient.prompt()
+                ChatResponse response = chatClient.prompt()
                         .system(configService.memoryPrompt())
                         .user(user)
+                        .tools(memoryTool)
                         .call()
-                        .content();
+                        .chatResponse();
+                if (isContentFilterRefusal(response)) {
+                    throw new IllegalStateException(
+                            "AI provider refused the memory-synthesis request (content_filter); no memory changes were applied");
+                }
+                return;
             } catch (RuntimeException e) {
                 last = e;
                 log.warn("memory synthesis AI call failed (attempt {}/{}): {}",
@@ -297,6 +339,31 @@ public class MemoryService {
             }
         }
         throw last;
+    }
+
+    private static boolean isContentFilterRefusal(ChatResponse response) {
+        return response.getResults().stream()
+                .map(Generation::getMetadata)
+                .map(ChatGenerationMetadata::getFinishReason)
+                .anyMatch(FINISH_REASON_CONTENT_FILTER::equalsIgnoreCase);
+    }
+
+    private void recordFailure(Long channelId, Long fromId, Long toId, String error) {
+        try {
+            chatMemoryFailureRepository.save(ChatMemoryFailure.builder()
+                    .chatChannelId(channelId)
+                    .fromMessageId(fromId)
+                    .toMessageId(toId)
+                    .error(error == null ? "" : truncate(error, FAILURE_ERROR_MAX_LENGTH))
+                    .createdAt(Instant.now())
+                    .build());
+        } catch (RuntimeException e) {
+            log.error("failed to record memory failure for channel {}: {}", channelId, e.getMessage());
+        }
+    }
+
+    private static String truncate(String value, int max) {
+        return value.length() <= max ? value : value.substring(0, max);
     }
 
 }

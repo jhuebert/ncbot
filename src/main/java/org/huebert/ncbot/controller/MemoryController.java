@@ -3,6 +3,7 @@ package org.huebert.ncbot.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.controller.dto.MemoryDto;
+import org.huebert.ncbot.controller.dto.MemoryFailureDto;
 import org.huebert.ncbot.controller.dto.PageResponse;
 import org.huebert.ncbot.service.MemoryService;
 import org.huebert.ncbot.util.DebugLog;
@@ -44,6 +45,35 @@ public class MemoryController {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.ASC, "key"));
         return PageResponse.fromPage(memoryService.findGlobalMemory(query, pageable), MemoryDto::from);
     }
+
+    @DebugLog
+    @GetMapping("/memories/failures")
+    public PageResponse<MemoryFailureDto> getMemoryFailures(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return PageResponse.fromPage(memoryService.findRecentFailures(pageable), f -> f);
+    }
+
+    @DebugLog
+    @GetMapping("/channels/{channelId}/memories/failures")
+    public PageResponse<MemoryFailureDto> getChannelMemoryFailures(
+            @PathVariable Long channelId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "" + DEFAULT_PAGE_SIZE) int size
+    ) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return PageResponse.fromPage(memoryService.findChannelFailures(channelId, pageable), f -> f);
+    }
+
+    @DebugLog
+    @PostMapping("/memories/failures/{id}/retry")
+    public ResponseEntity<Void> retryMemoryFailure(@PathVariable Long id) {
+        memoryService.retryFailure(id);
+        return ResponseEntity.noContent().build();
+    }
+
 
     @DebugLog
     @PostMapping("/channels/{channelId}/memory")

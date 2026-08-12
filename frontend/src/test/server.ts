@@ -243,6 +243,19 @@ export const handlers = [
     return new HttpResponse(null, { status: 204 });
   }),
 
+  // Memory Synthesis Failures
+  http.get("*/v1/memories/failures", () => {
+    return HttpResponse.json(pageResponse([]));
+  }),
+
+  http.get("*/v1/channels/:channelId/memories/failures", () => {
+    return HttpResponse.json(pageResponse([]));
+  }),
+
+  http.post("*/v1/memories/failures/:id/retry", () => {
+    return new HttpResponse(null, { status: 204 });
+  }),
+
   // Global Participants
   http.get("*/v1/participants", () => {
     return HttpResponse.json(pageResponse(mockParticipants));

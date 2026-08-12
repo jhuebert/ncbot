@@ -54,6 +54,13 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
     Optional<Instant> findLastMessageByChannelId(Long chatChannelId);
 
     @Query("""
+            SELECT m.createdAt
+            FROM ChatMessage m
+            WHERE m.id = :id
+            """)
+    Optional<Instant> findCreatedAt(Long id);
+
+    @Query("""
             SELECT m
             FROM ChatMessage m
             WHERE m.chatChannelId = :chatChannelId

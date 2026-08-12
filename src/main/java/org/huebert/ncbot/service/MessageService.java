@@ -41,4 +41,10 @@ public class MessageService {
         return chatMessageRepository.findChannelMessages(id, start, end);
     }
 
+    @DebugLog
+    @Transactional(readOnly = true)
+    public java.util.Optional<Instant> findCreatedAt(Long id) {
+        return chatMessageRepository.findCreatedAt(id);
+    }
+
 }

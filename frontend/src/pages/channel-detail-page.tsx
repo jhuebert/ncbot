@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { useParams } from "react-router-dom";
-import { ArrowLeft, Plus, Trash2, Edit3, ArrowUp } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Edit3, ArrowUp, AlertTriangle } from "lucide-react";
 import {
   useChannelMessages,
   useChannelMemory,
@@ -11,6 +11,8 @@ import {
   useCreateChannelMemory,
   useUpdateChannelMemory,
   useUpdateParticipantBlocked,
+  useChannelMemoryFailures,
+  useRetryMemoryFailure,
 } from "@/api/queries";
 import { useSearchQuery, useStringParam } from "@/lib/url-state";
 import {
@@ -21,6 +23,7 @@ import { PageState } from "@/components/page-state";
 import { InfiniteScroll } from "@/components/infinite-scroll";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MemoryFormDialog } from "@/components/memory-form-dialog";
+import { MemoryFailuresTable } from "@/components/memory-failures-table";
 import type { MemoryFormValues } from "@/components/memory-form-dialog";
 import { SearchInput } from "@/components/search-input";
 import { Button, Table, THead, Th, Td, Badge } from "@/components/ui/base";
@@ -284,6 +287,10 @@ function MemoryTab({ channelId }: { channelId: number }) {
   const deleteMutation = useDeleteChannelMemory(channelId);
   const promoteMutation = usePromoteMemory(channelId);
 
+  const failuresQuery = useChannelMemoryFailures(channelId);
+  const retryFailure = useRetryMemoryFailure();
+  const failures = failuresQuery.data?.content ?? [];
+
   const memories = data?.pages.flatMap((p) => p.content) ?? [];
   const isEmpty = !isLoading && !error && memories.length === 0;
 
@@ -323,6 +330,34 @@ function MemoryTab({ channelId }: { channelId: number }) {
           </Button>
         </div>
       </div>
+
+      {failures.length > 0 && (
+        <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+          <div className="flex items-center gap-2 text-sm font-medium text-amber-300">
+            <AlertTriangle className="h-4 w-4" />
+            {failures.length}{" "}
+            {failures.length === 1
+              ? "memory batch skipped"
+              : "memory batches skipped"}{" "}
+            after repeated AI failures
+          </div>
+          <p className="mt-1 text-xs text-gray-400">
+            Skipped batches are not re-processed automatically. Click Retry to
+            rewind this channel's memory cursor so the next scheduled run
+            attempts them again.
+          </p>
+          <div className="mt-3 overflow-x-auto rounded-lg border border-gray-800">
+            <MemoryFailuresTable
+              failures={failures}
+              onRetry={(f) => { retryFailure.mutate(f.id); }}
+              retryingId={
+                retryFailure.isPending ? retryFailure.variables : null
+              }
+              emptyText="No skipped memory batches for this channel."
+            />
+          </div>
+        </div>
+      )}
 
       <PageState
         isLoading={isLoading}

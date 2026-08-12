@@ -222,6 +222,72 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/memories/failures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List memory-synthesis failures
+         * @description Returns a paginated list of memory-synthesis partitions that were skipped after
+         *     repeated AI failures (most recent first). A partition is skipped after
+         *     `memory.max-failures` consecutive failed runs so a deterministically failing batch
+         *     does not get retried forever.
+         */
+        get: operations["getMemoryFailures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/memories/failures/{id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Retry a skipped memory-synthesis batch
+         * @description Rewinds the channel's memory cursor to just before the first message of the
+         *     skipped partition and deletes the failure record, so the next scheduled run
+         *     re-processes the batch.
+         */
+        post: operations["retryMemoryFailure"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/channels/{channelId}/memories/failures": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List memory-synthesis failures for a channel
+         * @description Returns a paginated list of memory-synthesis partitions skipped for the given
+         *     channel after repeated AI failures (most recent first).
+         */
+        get: operations["getChannelMemoryFailures"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/config": {
         parameters: {
             query?: never;
@@ -586,6 +652,41 @@ export interface components {
         PageResponseMemoryDto: components["schemas"]["PageResponse"] & {
             /** @description Paginated list of memories. */
             content?: components["schemas"]["MemoryDto"][];
+        };
+        MemoryFailureDto: {
+            /**
+             * Format: int64
+             * @description Failure record id.
+             */
+            id?: number;
+            /**
+             * Format: int64
+             * @description Channel whose memory synthesis failed.
+             */
+            channelId?: number;
+            /** @description Display name of the channel (null if the channel was deleted). */
+            channelName?: string | null;
+            /**
+             * Format: int64
+             * @description First message id of the skipped partition.
+             */
+            fromMessageId?: number | null;
+            /**
+             * Format: int64
+             * @description Last message id of the skipped partition.
+             */
+            toMessageId?: number | null;
+            /** @description Error message that caused the batch to be skipped. */
+            error?: string | null;
+            /**
+             * Format: date-time
+             * @description When the partition was skipped.
+             */
+            createdAt?: string;
+        };
+        PageResponseMemoryFailureDto: components["schemas"]["PageResponse"] & {
+            /** @description Paginated list of memory-synthesis failures. */
+            content?: components["schemas"]["MemoryFailureDto"][];
         };
         PageResponseParticipantDto: components["schemas"]["PageResponse"] & {
             /** @description Paginated list of participants. */
@@ -1262,6 +1363,119 @@ export interface operations {
                 content?: never;
             };
             /** @description Memory not found or memory is not global (belongs to a channel). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getMemoryFailures: {
+        parameters: {
+            query?: {
+                /** @description Page number (0-indexed). */
+                page?: number;
+                /** @description Number of items per page. */
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of memory-synthesis failures. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "content": [
+                     *         {
+                     *           "id": 1,
+                     *           "channelId": 41,
+                     *           "channelName": "#ncbot",
+                     *           "fromMessageId": 1200,
+                     *           "toMessageId": 1299,
+                     *           "error": "AI provider refused the memory-synthesis request (content_filter)",
+                     *           "createdAt": "2026-08-12T11:00:00Z"
+                     *         }
+                     *       ],
+                     *       "totalPages": 1,
+                     *       "currentPage": 0,
+                     *       "totalElements": 1
+                     *     }
+                     */
+                    "application/json": components["schemas"]["PageResponseMemoryFailureDto"];
+                };
+            };
+            /** @description Invalid query parameter. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    retryMemoryFailure: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Numeric ID of the failure record to retry. */
+                id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Failure record cleared and channel cursor rewound for re-processing. No content returned. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Failure record not found, or the originating message no longer exists. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getChannelMemoryFailures: {
+        parameters: {
+            query?: {
+                /** @description Page number (0-indexed). */
+                page?: number;
+                /** @description Number of items per page. */
+                size?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Numeric ID of the channel. */
+                channelId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Paginated list of memory-synthesis failures for the channel. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PageResponseMemoryFailureDto"];
+                };
+            };
+            /** @description Invalid query parameter or channel not found. */
             400: {
                 headers: {
                     [name: string]: unknown;

@@ -4,8 +4,11 @@
 @import java.util.Collection
 @import java.util.List
 
+@param Long channelId
 @param Collection<ChatMemory> memories
 @param List<PromptMessage> messages
+
+CHANNEL_ID: ${channelId}
 
 __CHAT_MEMORY__
 @for(ChatMemory m : memories)

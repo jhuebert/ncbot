@@ -19,6 +19,9 @@ import {
   createGlobalMemory,
   updateGlobalMemory,
   deleteGlobalMemory,
+  fetchMemoryFailures,
+  fetchChannelMemoryFailures,
+  retryMemoryFailure,
   fetchAllParticipants,
   updateParticipantBlocked,
   fetchConfigItems,
@@ -61,10 +64,8 @@ export const queryKeys = {
     ) => ["messages", channelId, params] as const,
   },
   channelMemory: {
-    byChannel: (
-      channelId: number,
-      params?: { query?: string },
-    ) => ["channelMemory", channelId, params] as const,
+    byChannel: (channelId: number, params?: { query?: string }) =>
+      ["channelMemory", channelId, params] as const,
   },
   channelParticipants: {
     all: ["channelParticipants"] as const,
@@ -75,6 +76,12 @@ export const queryKeys = {
     all: ["globalMemory"] as const,
     list: (params?: { query?: string }) =>
       ["globalMemory", "list", params] as const,
+  },
+  memoryFailures: {
+    all: ["memoryFailures"] as const,
+    list: (params?: { page?: number; size?: number }) =>
+      ["memoryFailures", "list", params] as const,
+    byChannel: (channelId: number) => ["memoryFailures", channelId] as const,
   },
   participants: {
     all: ["participants"] as const,
@@ -308,6 +315,40 @@ export function useDeleteGlobalMemory() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.globalMemory.all });
       toast.success("Global memory deleted");
+    },
+    onError: (err: Error) => {
+      toast.error(err.message);
+    },
+  });
+}
+
+// ── Memory Synthesis Failures ──
+
+export function useMemoryFailures() {
+  return useInfiniteQuery({
+    queryKey: queryKeys.memoryFailures.list(),
+    queryFn: ({ pageParam = 0 }) =>
+      fetchMemoryFailures({ page: pageParam, size: LIST_PAGE_SIZE }),
+    initialPageParam: 0,
+    getNextPageParam: nextPageParam,
+  });
+}
+
+export function useChannelMemoryFailures(channelId: number) {
+  return useQuery({
+    queryKey: queryKeys.memoryFailures.byChannel(channelId),
+    queryFn: () => fetchChannelMemoryFailures(channelId, { size: 25 }),
+  });
+}
+
+export function useRetryMemoryFailure() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => retryMemoryFailure(id),
+    onSuccess: () => {
+      // Prefix-invalidates both the aggregate list and per-channel failure queries.
+      qc.invalidateQueries({ queryKey: queryKeys.memoryFailures.all });
+      toast.success("Memory batch queued for retry");
     },
     onError: (err: Error) => {
       toast.error(err.message);

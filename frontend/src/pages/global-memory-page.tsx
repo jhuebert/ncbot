@@ -5,20 +5,27 @@ import {
   useCreateGlobalMemory,
   useUpdateGlobalMemory,
   useDeleteGlobalMemory,
+  useMemoryFailures,
+  useRetryMemoryFailure,
 } from "@/api/queries";
 import { useSearchQuery } from "@/lib/url-state";
 import { PageState } from "@/components/page-state";
 import { InfiniteScroll } from "@/components/infinite-scroll";
 import { ConfirmDialog } from "@/components/confirm-dialog";
 import { MemoryFormDialog } from "@/components/memory-form-dialog";
+import { MemoryFailuresTable } from "@/components/memory-failures-table";
 import type { MemoryFormValues } from "@/components/memory-form-dialog";
 import { SearchInput } from "@/components/search-input";
 import { Button, Table, THead, Th, Td } from "@/components/ui/base";
+import { clsx } from "clsx";
 import { truncate } from "@/lib/format";
-import type { MemoryDto } from "@/api/admin";
+import type { MemoryDto, MemoryFailureDto } from "@/api/admin";
+
+type MemoryTab = "memories" | "failures";
 
 export function GlobalMemoryPage() {
   const [query, setQuery] = useSearchQuery();
+  const [activeTab, setActiveTab] = useState<MemoryTab>("memories");
   const [formOpen, setFormOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<MemoryDto | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<MemoryDto | null>(null);
@@ -37,8 +44,16 @@ export function GlobalMemoryPage() {
   const updateMutation = useUpdateGlobalMemory();
   const deleteMutation = useDeleteGlobalMemory();
 
+  const failuresQuery = useMemoryFailures();
+  const retryFailure = useRetryMemoryFailure();
+  const failures = failuresQuery.data?.pages.flatMap((p) => p.content) ?? [];
+
   const memories = data?.pages.flatMap((p) => p.content) ?? [];
   const isEmpty = !isLoading && !error && memories.length === 0;
+
+  const handleRetry = (failure: MemoryFailureDto) => {
+    retryFailure.mutate(failure.id);
+  };
 
   const handleSubmit = (values: MemoryFormValues) => {
     if (editTarget) {
@@ -55,6 +70,7 @@ export function GlobalMemoryPage() {
     <div>
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold text-gray-100">Global Memory</h1>
+        {activeTab === "memories" && (
         <div className="flex items-center gap-2">
           <SearchInput
             value={query}
@@ -73,8 +89,34 @@ export function GlobalMemoryPage() {
             Add Memory
           </Button>
         </div>
+        )}
       </div>
 
+      <div className="mt-4 flex items-center gap-4 border-b border-gray-800">
+        {(["memories", "failures"] as const).map((tab) => (
+          <button
+            key={tab}
+            role="tab"
+            aria-selected={activeTab === tab}
+            onClick={() => setActiveTab(tab)}
+            className={clsx(
+              "border-b-2 px-3 py-2 text-sm font-medium transition-colors",
+              activeTab === tab
+                ? "border-primary-400 text-primary-300"
+                : "border-transparent text-gray-500 hover:border-gray-600 hover:text-gray-300",
+            )}
+          >
+            {tab === "memories" ? "Memories" : "Failures"}
+            {tab === "failures" && failures.length > 0 && (
+              <span className="ml-1.5 rounded-full bg-red-500/15 px-1.5 py-0.5 text-xs font-semibold text-red-400">
+                {failures.length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {activeTab === "memories" ? (
       <div className="mt-4">
         <PageState
           isLoading={isLoading}
@@ -134,6 +176,30 @@ export function GlobalMemoryPage() {
           </InfiniteScroll>
         </PageState>
       </div>
+      ) : (
+      <div className="mt-4">
+        <PageState
+          isLoading={failuresQuery.isLoading}
+          error={failuresQuery.error}
+          isEmpty={!failuresQuery.isLoading && !failuresQuery.error && failures.length === 0}
+          emptyText="No skipped memory batches."
+          onRetry={() => failuresQuery.refetch()}
+        >
+          <InfiniteScroll
+            onLoadMore={() => failuresQuery.fetchNextPage()}
+            hasMore={failuresQuery.hasNextPage}
+            isLoadingMore={failuresQuery.isFetchingNextPage}
+            className="max-h-[70vh] rounded-lg border border-gray-800"
+          >
+            <MemoryFailuresTable
+              failures={failures}
+              onRetry={handleRetry}
+              retryingId={retryFailure.isPending ? retryFailure.variables : null}
+            />
+          </InfiniteScroll>
+        </PageState>
+      </div>
+      )}
 
       <MemoryFormDialog
         open={formOpen}

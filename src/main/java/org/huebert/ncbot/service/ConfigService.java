@@ -222,6 +222,10 @@ public class ConfigService {
         return getInt(ConfigItemDefinition.MEMORY_PARTITION_SIZE);
     }
 
+    public int memoryMaxFailures() {
+        return getInt(ConfigItemDefinition.MEMORY_MAX_FAILURES);
+    }
+
     public long minimumResponseMs() {
         return getLong(ConfigItemDefinition.MINIMUM_RESPONSE_MS);
     }

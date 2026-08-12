@@ -43,6 +43,9 @@ public enum ConfigItemDefinition {
               Time-sensitive claims in older messages (weather, status, prices) are stale — use each message's
               "age"/"timestamp" to judge; if a claim is older than ~15 minutes, call the tool for fresh data.
               Tool calls are slow — otherwise prefer memory and conversation context. If a tool returns nothing, say so briefly.
+            - Memory tools: use insertMemory/updateMemory/deleteMemory to persist durable user facts (preferences,
+              identity, decisions, rules) stated in this conversation; current memories are listed in __CHAT_MEMORY__.
+              Do not store ephemeral content (mood, status, current activity, one-off remarks).
 
             Input blocks: __CHAT_MEMORY__, __CHAT_MESSAGES__, __ADDITIONAL_CONTEXT__
             Output only the response text.
@@ -65,33 +68,37 @@ public enum ConfigItemDefinition {
             "bot.memory-prompt",
             ConfigType.TEXT,
             """
-            You are a memory synthesis engine. Convert conversation history into dense key=value pairs.
+            You are ncbot's memory manager. Update the long-term memory for the channel shown on the CHANNEL_ID line by calling tools.
 
-            Input: __CHAT_MEMORY__ (existing key=value memories) and __CHAT_MESSAGES__ (JSON array of
-            messages, oldest first; each entry has sender, message, timestamp/age, and an optional response).
+            Input:
+            - CHANNEL_ID: the numeric id of the current channel — pass this to every channel-scoped tool call.
+            - __CHAT_MEMORY__: the current channel+global memories (key=value, one per line). Global memories are read-only.
+            - __CHAT_MESSAGES__: JSON array of messages, oldest first; each entry has sender, message, timestamp/age, and an optional response.
 
-            Output rules:
-            - No changes → output only: EMPTY
-            - Delete keys by setting value to __DELETE__
-            - Output only raw key=value pairs, one per line
-            - No markdown, no backticks, no explanations
+            Use these tools to update ONLY durable, useful facts:
+            - insertMemory(channelId, key, value): add a new channel memory (fails if the key already exists)
+            - updateMemory(channelId, key, value): change an existing channel memory (fails if it does not exist)
+            - deleteMemory(channelId, key): remove an existing channel memory (fails if it does not exist)
 
-            Pruning — delete any memory that is:
-            - Temporary/ephemeral (current activity, mood, presence, what user last said/asked)
-            - A one-off comment or reaction
-            - A bot response summary
-            - Duplicate or overlapping with a more specific key
-            - Using these forbidden suffixes: status, mood, greeting, activity, last_*, current_, next_
-
-            Only store persistent facts: user identity (location, role, callsign), preferences, relationships,
-            ongoing channel jokes/rivalries, scores, decisions, user-defined bot rules.
-            Limit to 5-8 facts per user. Prefer deletion over retention.
-
-            Format: dot-separated keys (channel.*, bot.*, user.[name].*). Values are dense facts, not sentences.
-            Example: user.john.pref.color=blue (not "The user likes blue")
-            Example: channel.joke.running=user calls bot a potato
+            Rules:
+            - Only store durable facts: user preferences, user relationships,
+              ongoing channel jokes/rivalries, decisions, user-defined bot rules.
+            - Prune ephemeral memories: current activity, mood, presence, last-seen statements, one-off comments,
+              bot response summaries. Prefer deletion over retention.
+            - Delete keys with forbidden suffixes: status, mood, greeting, activity, last_*, current_, next_.
+            - Limit to at most 5-8 facts per user.
+            - Keys are dot-separated (channel.*, bot.*, user.[name].*). Values are dense facts, not sentences.
+            - A channel memory with the same key as a global memory overrides it for this channel only — never modify global memory.
+            - Make all needed changes in one turn; do not narrate.
             """,
-            "Prompt used for scheduled memory synthesis.",
+            "Prompt used for scheduled memory synthesis (the model updates memory via tools).",
+            false),
+
+    MEMORY_MAX_FAILURES(
+            "memory.max-failures",
+            ConfigType.INT,
+            "3",
+            "Consecutive failed memory-synthesis runs per channel before a partition is skipped (cursor advanced) so a deterministically failing batch is not retried forever.",
             false),
 
     WELCOME_CONTENT(
