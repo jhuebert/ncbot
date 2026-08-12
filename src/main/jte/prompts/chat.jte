@@ -1,13 +1,13 @@
 @import org.huebert.ncbot.dto.ChatRequest
 @import org.huebert.ncbot.entity.ChatMemory
-@import org.huebert.ncbot.entity.ChatMessage
-@import org.huebert.ncbot.util.RelativeTime
+@import org.huebert.ncbot.dto.PromptMessage
+@import org.huebert.ncbot.util.PromptMessages
 @import java.time.ZonedDateTime
 @import java.time.format.DateTimeFormatter
 @import java.util.List
 
 @param List<ChatMemory> memories
-@param List<ChatMessage> messages
+@param List<PromptMessage> messages
 @param ChatRequest request
 
 __CHAT_MEMORY__
@@ -15,10 +15,7 @@ __CHAT_MEMORY__
 ${memory.getKey()}=${memory.getValue()}@endfor
 
 __CHAT_MESSAGES__
-@for(ChatMessage msg : messages)
-@if(msg.getCreatedAt() != null)[${RelativeTime.format(msg.getCreatedAt())}] @endif${msg.getSenderName()}: ${msg.getContent()}
-@if(msg.getResponse() != null)ncbot: ${msg.getResponse()}@endif@endfor
-[just now] ${request.senderName()}: ${request.messageText()}
+${PromptMessages.toJson(messages)}
 
 __ADDITIONAL_CONTEXT__
 

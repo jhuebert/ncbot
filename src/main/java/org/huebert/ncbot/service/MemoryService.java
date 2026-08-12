@@ -8,6 +8,7 @@ import org.huebert.ncbot.config.ChannelCapabilities;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatMemory;
 import org.huebert.ncbot.entity.ChatMessage;
+import org.huebert.ncbot.dto.PromptMessage;
 import org.huebert.ncbot.repository.ChatMemory2Repository;
 import org.huebert.ncbot.util.DebugLog;
 import org.springframework.ai.chat.client.ChatClient;
@@ -251,7 +252,7 @@ public class MemoryService {
 
         String user = templateService.render("memory", Map.of(
                 "memories", existingMemories.values(),
-                "messages", messages
+                "messages", messages.stream().map(PromptMessage::from).collect(Collectors.toList())
         ));
         log.debug("getUpdates: user={}", user);
 

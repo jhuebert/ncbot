@@ -7,6 +7,7 @@ import org.huebert.ncbot.config.AiMode;
 import org.huebert.ncbot.config.ChannelCapabilities;
 import org.huebert.ncbot.config.NcbotProperties;
 import org.huebert.ncbot.dto.ChatRequest;
+import org.huebert.ncbot.dto.PromptMessage;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.entity.ChatMemory;
 import org.huebert.ncbot.entity.ChatMessage;
@@ -24,6 +25,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -104,9 +106,12 @@ public class AiChatHandler implements ChatHandler {
                 : List.of();
         log.debug("handle: loaded {} messages, {} memories for channel {}", messages.size(), memories.size(), chatChannel.getChannelName());
 
+        List<PromptMessage> promptMessages = new ArrayList<>(messages.stream().map(PromptMessage::from).toList());
+        promptMessages.add(PromptMessage.now(request.senderName(), request.messageText()));
+
         String output = templateService.render("chat", Map.of(
                 "memories", memories,
-                "messages", messages,
+                "messages", promptMessages,
                 "request", request
         ));
 

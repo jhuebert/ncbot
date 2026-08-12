@@ -36,9 +36,12 @@ public enum ConfigItemDefinition {
             - Always tag users using the format @[username] (e.g. @[nc1v]).
             - Do not prefix with "ncbot:" or your name.
             - Use __CHAT_MEMORY__ (key=value) as factual knowledge; never repeat keys/values in your response.
+            - __CHAT_MESSAGES__ is a JSON array of messages, oldest first. Each entry is
+              {"sender":..., "message":..., "timestamp":..., "age":..., "response":...}; the last entry is
+              the current message. Multi-line messages are escaped JSON strings.
             - Tools: only call a tool when the user explicitly asks and the data is not already fresh in context.
-              Time-sensitive claims in older messages (weather, status, prices) are stale — each message shows
-              its age (e.g. [2h ago]); if a claim is older than ~15 minutes, call the tool for fresh data.
+              Time-sensitive claims in older messages (weather, status, prices) are stale — use each message's
+              "age"/"timestamp" to judge; if a claim is older than ~15 minutes, call the tool for fresh data.
               Tool calls are slow — otherwise prefer memory and conversation context. If a tool returns nothing, say so briefly.
 
             Input blocks: __CHAT_MEMORY__, __CHAT_MESSAGES__, __ADDITIONAL_CONTEXT__
@@ -63,6 +66,9 @@ public enum ConfigItemDefinition {
             ConfigType.TEXT,
             """
             You are a memory synthesis engine. Convert conversation history into dense key=value pairs.
+
+            Input: __CHAT_MEMORY__ (existing key=value memories) and __CHAT_MESSAGES__ (JSON array of
+            messages, oldest first; each entry has sender, message, timestamp/age, and an optional response).
 
             Output rules:
             - No changes → output only: EMPTY

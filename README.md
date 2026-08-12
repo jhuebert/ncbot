@@ -222,7 +222,7 @@ The AI model has access to these tools:
 |------|-------------|
 | `getWeather` | Get current weather **and** the 7-day forecast for a location (via Open-Meteo). Returns location/time zone, current observations (temperature, feels-like, wind speed, gusts, wind direction, humidity, precipitation, cloud cover, pressure, conditions) and a per-day forecast (high/low, conditions, precipitation chance, UV index, sunrise/sunset). Bounded by `NCBOT_WEATHER_TIMEOUT` (default 10 s) so a hung lookup can't stall the AI call. |
 
-The tool/param descriptions tell the model to estimate coordinates from a location name and to judge freshness: chat history carries per-message ages (e.g. `[2h ago]`, rendered in `__CHAT_MESSAGES__` alongside the current `Time:` line), so a time-sensitive claim like weather older than ~15 minutes is treated as stale and triggers a fresh tool call, while fresh data avoids one.
+The tool/param descriptions tell the model to estimate coordinates from a location name and to judge freshness: chat history is a JSON array (`__CHAT_MESSAGES__`) where each message carries an absolute `timestamp` and a coarse human-readable `age` (e.g. `"age":"2h ago"`), rendered alongside the current `Time:` line, so a time-sensitive claim like weather older than ~15 minutes is treated as stale and triggers a fresh tool call, while fresh data avoids one.
 
 ## Admin API
 
