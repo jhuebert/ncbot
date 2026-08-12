@@ -6,4 +6,7 @@ RUN mkdir -p /data && addgroup -S ncbot && adduser -S ncbot -G ncbot && chown -R
 COPY build/libs/ncbot.jar app.jar
 EXPOSE 8080
 USER ncbot
-ENTRYPOINT ["java", "-jar", "app.jar", "--spring.datasource.url=jdbc:sqlite:/data/ncbot.db"]
+# --enable-native-access=ALL-UNNAMED silences sqlite-jdbc's restricted-method
+# warning (System::load) and is required for it to keep working in future JVMs
+# where restricted native access is blocked by default.
+ENTRYPOINT ["java", "--enable-native-access=ALL-UNNAMED", "-jar", "app.jar", "--spring.datasource.url=jdbc:sqlite:/data/ncbot.db"]

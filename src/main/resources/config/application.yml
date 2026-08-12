@@ -13,6 +13,11 @@ spring:
       maximum-pool-size: 1
       connection-init-sql: "PRAGMA journal_mode=WAL; PRAGMA busy_timeout=10000;"
   jpa:
+    # Disable OpenEntityManagerInView so DB queries are not held open during view
+    # rendering and no implicit session spans beyond request handling. All entities
+    # here are flat (no lazy associations) and service methods are @Transactional,
+    # so this is safe and silences the Spring startup warning.
+    open-in-view: false
     hibernate:
       ddl-auto: update
     properties:
