@@ -11,6 +11,7 @@ import org.huebert.ncbot.config.ConfigType;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ConfigItem;
 import org.huebert.ncbot.repository.ConfigItemRepository;
+import org.huebert.ncbot.util.DebugLog;
 import org.huebert.ncbot.util.PatternUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -61,6 +62,7 @@ public class ConfigService {
      */
     @PostConstruct
     @Transactional
+    @DebugLog
     public void seedDefaults() {
         for (ConfigItemDefinition def : ConfigItemDefinition.values()) {
             if (repository.findById(def.key()).isEmpty()) {
@@ -79,6 +81,7 @@ public class ConfigService {
      * All definitions merged with their stored (or default) value, stable order.
      */
     @Transactional(readOnly = true)
+    @DebugLog
     public List<ConfigItemEntry> list() {
         Map<String, ConfigItem> stored = repository.findAll().stream()
                 .collect(Collectors.toMap(ConfigItem::getKey, a -> a));
@@ -93,6 +96,7 @@ public class ConfigService {
     }
 
     @Transactional(readOnly = true)
+    @DebugLog
     public ConfigItemEntry get(String key) {
         ConfigItemDefinition def = ConfigItemDefinition.fromKey(key);
         return list().stream()
@@ -105,6 +109,7 @@ public class ConfigService {
      * Update a configuration item's value, validating it against its declared type.
      */
     @Transactional
+    @DebugLog
     public ConfigItemEntry update(String key, String newValue) {
         ConfigItemDefinition def = ConfigItemDefinition.fromKey(key);
         String normalized = validate(def, newValue);
@@ -121,6 +126,7 @@ public class ConfigService {
      * Restore a configuration item to its sensible default (removes the override).
      */
     @Transactional
+    @DebugLog
     public ConfigItemEntry reset(String key) {
         ConfigItemDefinition def = ConfigItemDefinition.fromKey(key);
         repository.findById(def.key()).ifPresent(repository::delete);
@@ -305,6 +311,7 @@ public class ConfigService {
         return Optional.of(getChannelCapabilities(request.channelName()));
     }
 
+    @DebugLog
     public ChannelCapabilities getChannelCapabilities(String channelName) {
         return channelCapabilities.computeIfAbsent(channelName, this::from);
     }
@@ -312,6 +319,7 @@ public class ConfigService {
     /**
      * Check whether command handling is enabled for the given request.
      */
+    @DebugLog
     public boolean isCommandEnabled(ChatRequest request) {
         return getChannelCapabilities(request)
                 .map(ChannelCapabilities::command)

@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.entity.ChatMemory;
 import org.huebert.ncbot.repository.ChatChannelRepository;
 import org.huebert.ncbot.repository.ChatMemory2Repository;
+import org.huebert.ncbot.util.DebugLog;
 import org.springframework.ai.tool.annotation.Tool;
 import org.springframework.ai.tool.annotation.ToolParam;
 import org.springframework.stereotype.Component;
@@ -45,6 +46,7 @@ public class MemoryTool {
     public record MemoryResult(String status, String message) {
     }
 
+    @DebugLog
     @Tool(description = "Insert a NEW channel-scoped memory. Fails if a channel memory with the same key already "
             + "exists for that channel (use updateMemory instead). If a global memory has the same key, this creates a "
             + "channel-scoped override for that channel. Values are dense facts, not full sentences.")
@@ -68,6 +70,7 @@ public class MemoryTool {
         return new MemoryResult("ok", "inserted channel memory '" + key + "'");
     }
 
+    @DebugLog
     @Tool(description = "Update the value of an EXISTING channel-scoped memory. Fails if no channel memory with the "
             + "key exists for that channel (use insertMemory instead). Global memory can never be updated — to customize "
             + "a global fact for this channel, insert a channel memory with the same key.")
@@ -89,6 +92,7 @@ public class MemoryTool {
         return new MemoryResult("ok", "updated channel memory '" + key + "'");
     }
 
+    @DebugLog
     @Tool(description = "Delete an EXISTING channel-scoped memory. Fails if no channel memory with the key exists "
             + "for that channel. Only removes the channel-scoped memory; global memory is never touched (a global memory "
             + "with the same key remains effective in other channels).")
