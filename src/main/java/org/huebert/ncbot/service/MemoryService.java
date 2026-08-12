@@ -175,9 +175,10 @@ public class MemoryService {
                 updateChannel(channel, now);
             } catch (RuntimeException e) {
                 // Isolate failures: one channel's AI timeout must not abort memory
-                // updates for the remaining channels. The channel is left un-marked as
-                // updated, so it will be retried on the next scheduled run.
-                log.error("memory update failed for channel {} ({}); will retry next cycle: {}",
+                // updates for the remaining channels. Completed partitions were already
+                // marked as updated, so the next scheduled run resumes from the failed
+                // partition instead of reprocessing the whole channel.
+                log.error("memory update failed for channel {} ({}); will resume from last successful partition next cycle: {}",
                         channel.getId(), channel.getChannelName(), e.getMessage(), e);
             }
         }
@@ -200,11 +201,15 @@ public class MemoryService {
             return;
         }
 
-        for (List<ChatMessage> partition : Lists.partition(messages, configService.memoryPartitionSize())) {
+        List<List<ChatMessage>> partitions = Lists.partition(messages, configService.memoryPartitionSize());
+        for (List<ChatMessage> partition : partitions) {
+            // Advance the cursor to this partition's last message as soon as it succeeds. If a
+            // later partition fails, only the failed partition onward is re-processed on the next
+            // cycle instead of re-running memory synthesis over every already-done partition.
+            Instant cursor = partition.get(partition.size() - 1).getCreatedAt();
             updateMemory(channel, partition);
+            channelService.setMemoryUpdated(channel.getId(), cursor);
         }
-
-        channelService.setMemoryUpdated(channel.getId());
     }
 
     private void updateMemory(ChatChannel channel, List<ChatMessage> messages) {

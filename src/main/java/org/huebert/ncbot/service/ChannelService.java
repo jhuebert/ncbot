@@ -107,8 +107,8 @@ public class ChannelService {
 
     @DebugLog
     @Transactional
-    public void setMemoryUpdated(Long id) {
-        channelRepository.setMemoryUpdated(id, Instant.now());
+    public void setMemoryUpdated(Long id, Instant instant) {
+        channelRepository.setMemoryUpdated(id, instant);
     }
 
     private static String normalized(String query) {
