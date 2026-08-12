@@ -102,7 +102,7 @@ The `config_item` table is a key–value store keyed by dot-separated names, see
 |---|---|---|
 | `bot.*` | `bot.name`, `bot.system-prompt`, `bot.condense-prompt`, `bot.memory-prompt` | STRING / TEXT |
 | `chat.*` | `chat.welcome-content`, `chat.max-history`, `chat.ai-enabled`, `chat.auto-update-memory`, `chat.use-memory`, `chat.condense`, `chat.allow-one-byte-paths`, `chat.path-upgrade-cooldown-minutes`, `chat.minimum-response-ms`, `chat.max-reply-bytes`, `chat.max-reply-tokens` | BOOLEAN / INT / LONG |
-| `memory.*` | `memory.partition-size` | INT |
+| `memory.*` | `memory.partition-size`, `memory.max-failures` | INT |
 | `channels.*` | `channels.welcome`, `channels.command`, `channels.path-upgrade`, `channels.ai-each`, `channels.ai-tagged`, `channels.allowed-dms` | STRING / LIST |
 | `blocking.*` | `blocking.block-user`, `blocking.allow-user`, `blocking.block-path`, `blocking.allow-path`, `blocking.block-channel`, `blocking.allow-channel` | STRING |
 
@@ -211,8 +211,9 @@ ncbot maintains long-term memory per channel using AI-generated key-value pairs.
 
 - **Condensing**: When an AI response exceeds the byte limit, a second AI call condenses it to fit
 - **Partitions**: Memory updates process messages in configurable batches
-- **Storage**: Memories are stored in the `chat_memory` table, scoped to each channel
-- **Resilience**: Each channel's synthesis is run independently, so a transient AI failure (e.g. a provider timeout/stream reset) on one channel doesn't abort updates for the others; the failing channel is retried on the next cycle. The memory-synthesis AI call itself retries up to 3 times per partition.
+- **Storage**: Memories are stored in the `chat_memory` table, scoped to each channel; global memories (`chat_channel_id = NULL`) apply everywhere
+- **Tool-driven**: Memory synthesis no longer parses model text output. The model updates memory directly via the `insertMemory`/`updateMemory`/`deleteMemory` tools (channel-scoped only; global memory is read-only). Current memories are supplied inline as `__CHAT_MEMORY__`, so no read tools are needed. The same tools are available in live chat, so durable facts can be stored in real time
+- **Resilience**: Each channel's synthesis is run independently, so a transient AI failure (e.g. a provider timeout/stream reset) on one channel doesn't abort updates for the others; the memory-synthesis AI call itself retries up to 3 times per partition. After `memory.max-failures` consecutive failed runs, a partition is skipped (cursor advanced past it) and recorded via `/v1/memories/failures`, so a deterministically failing batch is never retried forever
 
 ### Tools
 
@@ -221,6 +222,9 @@ The AI model has access to these tools:
 | Tool | Description |
 |------|-------------|
 | `getWeather` | Get current weather **and** the 7-day forecast for a location (via Open-Meteo). Returns location/time zone, current observations (temperature, feels-like, wind speed, gusts, wind direction, humidity, precipitation, cloud cover, pressure, conditions) and a per-day forecast (high/low, conditions, precipitation chance, UV index, sunrise/sunset). Bounded by `NCBOT_WEATHER_TIMEOUT` (default 10 s) so a hung lookup can't stall the AI call. |
+| `insertMemory(channelId, key, value)` | Add a new channel memory; fails if the key already exists. A channel memory with the same key as a global one overrides it for that channel. |
+| `updateMemory(channelId, key, value)` | Update an existing channel memory; fails if it does not exist. |
+| `deleteMemory(channelId, key)` | Delete an existing channel memory; fails if it does not exist. |
 
 The tool/param descriptions tell the model to estimate coordinates from a location name and to judge freshness: chat history is a JSON array (`__CHAT_MESSAGES__`) where each message carries an absolute `timestamp` and a coarse human-readable `age` (e.g. `"age":"2h ago"`), rendered alongside the current `Time:` line, so a time-sensitive claim like weather older than ~15 minutes is treated as stale and triggers a fresh tool call, while fresh data avoids one.
 
@@ -256,6 +260,9 @@ Responses use the generic `PageResponse<T>` wrapper:
 | `/v1/memory` | POST | Create global memory (body: `{key, value}`) — `MemoryDto` |
 | `/v1/memory/{id}` | PUT | Update global memory (body: `{key, value}`) — validates global scope — `MemoryDto` |
 | `/v1/memory/{id}` | DELETE | Delete global memory — validates global scope — `204 No Content` |
+| `/v1/memories/failures` | GET | Memory-synthesis partitions skipped after repeated AI failures — `PageResponse<MemoryFailureDto>` |
+| `/v1/channels/{channelId}/memories/failures` | GET | Memory-synthesis failures for one channel — `PageResponse<MemoryFailureDto>` |
+| `/v1/memories/failures/{id}/retry` | POST | Rewind the channel cursor and clear the record so a skipped batch is re-processed — `204 No Content` |
 | `/v1/participants` | GET | All participants with last seen (search: `?query=`) — `PageResponse<ParticipantDto>` |
 | `/v1/participants/{participantId}` | PUT | Block/unblock a participant (body: `{blocked: true\|false}`) — `ParticipantDto` |
 

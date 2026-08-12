@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface ChatMemory2Repository extends JpaRepository<ChatMemory, Long> {
 
@@ -17,6 +18,13 @@ public interface ChatMemory2Repository extends JpaRepository<ChatMemory, Long> {
             ORDER BY m.key ASC
             """)
     List<ChatMemory> findMemory(Long chatChannelId);
+
+    @Query("""
+            SELECT m
+            FROM ChatMemory m
+            WHERE m.chatChannelId = :chatChannelId AND m.key = :key
+            """)
+    Optional<ChatMemory> findChannelMemoryByKey(Long chatChannelId, String key);
 
     @Query("""
             SELECT m

@@ -28,6 +28,16 @@ export interface MemoryDto {
   value: string;
 }
 
+export interface MemoryFailureDto {
+  id: number;
+  channelId: number | null;
+  channelName: string | null;
+  fromMessageId: number | null;
+  toMessageId: number | null;
+  error: string | null;
+  createdAt: string;
+}
+
 export interface ParticipantDto {
   id: number;
   name: string;
@@ -261,6 +271,39 @@ export async function deleteGlobalMemory(id: number): Promise<void> {
   const { error, response } = await client.DELETE("/v1/memory/{id}", {
     params: { path: { id } },
   });
+  if (error) throw await parseApiError(response);
+}
+
+// ── Memory Synthesis Failures ──
+
+export async function fetchMemoryFailures(params?: {
+  page?: number;
+  size?: number;
+}): Promise<PageResponse<MemoryFailureDto>> {
+  const { data, error, response } = await client.GET("/v1/memories/failures", {
+    params: { query: params },
+  });
+  if (error) throw await parseApiError(response);
+  return data as unknown as PageResponse<MemoryFailureDto>;
+}
+
+export async function fetchChannelMemoryFailures(
+  channelId: number,
+  params?: { page?: number; size?: number },
+): Promise<PageResponse<MemoryFailureDto>> {
+  const { data, error, response } = await client.GET(
+    "/v1/channels/{channelId}/memories/failures",
+    { params: { path: { channelId }, query: params } },
+  );
+  if (error) throw await parseApiError(response);
+  return data as unknown as PageResponse<MemoryFailureDto>;
+}
+
+export async function retryMemoryFailure(id: number): Promise<void> {
+  const { error, response } = await client.POST(
+    "/v1/memories/failures/{id}/retry",
+    { params: { path: { id } } },
+  );
   if (error) throw await parseApiError(response);
 }
 

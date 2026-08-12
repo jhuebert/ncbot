@@ -6,9 +6,12 @@
 @import java.time.format.DateTimeFormatter
 @import java.util.List
 
+@param Long channelId
 @param List<ChatMemory> memories
 @param List<PromptMessage> messages
 @param ChatRequest request
+
+CHANNEL_ID: ${channelId}
 
 __CHAT_MEMORY__
 @for(ChatMemory memory : memories)

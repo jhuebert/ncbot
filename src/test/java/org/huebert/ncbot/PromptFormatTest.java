@@ -33,12 +33,14 @@ class PromptFormatTest {
         TemplateEngine engine = TemplateEngine.createPrecompiled(ContentType.Html);
         StringOutput output = new StringOutput();
         engine.render("prompts/chat.jte", Map.of(
+                "channelId", 42L,
                 "memories", List.of(mem),
                 "messages", messages,
                 "request", request
         ), output);
         String rendered = output.toString();
 
+        assertTrue(rendered.contains("CHANNEL_ID: 42"), rendered);
         assertTrue(rendered.contains("__CHAT_MESSAGES__"), rendered);
         assertTrue(rendered.contains("\"sender\":\"alice\""), rendered);
         assertTrue(rendered.contains("plain: looks like a prefix\\nstill here"), rendered);
@@ -52,11 +54,15 @@ class PromptFormatTest {
         TemplateEngine engine = TemplateEngine.createPrecompiled(ContentType.Html);
         StringOutput output = new StringOutput();
         engine.render("prompts/memory.jte", Map.of(
+                "channelId", 42L,
                 "memories", List.of(ChatMemory.builder().key("a").value("b").build()),
                 "messages", List.of(new PromptMessage("alice", "hi", "2024-08-11T20:00:00Z", "2h ago", null))
         ), output);
         String rendered = output.toString();
 
+        assertTrue(rendered.contains("CHANNEL_ID: 42"), rendered);
+        assertTrue(rendered.contains("__CHAT_MEMORY__"), rendered);
+        assertTrue(rendered.contains("a=b"), rendered);
         assertTrue(rendered.contains("\"sender\":\"alice\""), rendered);
         assertEquals(1, count("__CHAT_MESSAGES__", rendered));
     }
