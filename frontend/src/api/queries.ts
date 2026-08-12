@@ -7,6 +7,7 @@ import {
 import {
   fetchChannels,
   deleteChannel,
+  fetchChannel,
   fetchChannelMessages,
   fetchChannelMemory,
   createChannelMemory,
@@ -51,6 +52,7 @@ export const queryKeys = {
     all: ["channels"] as const,
     list: (params?: { dm?: boolean; query?: string }) =>
       ["channels", "list", params] as const,
+    byId: (channelId: number) => ["channels", channelId] as const,
   },
   messages: {
     byChannel: (
@@ -107,6 +109,13 @@ export function useDeleteChannel() {
     onError: (err: Error) => {
       toast.error(err.message);
     },
+  });
+}
+
+export function useChannel(channelId: number) {
+  return useQuery({
+    queryKey: queryKeys.channels.byId(channelId),
+    queryFn: () => fetchChannel(channelId),
   });
 }
 

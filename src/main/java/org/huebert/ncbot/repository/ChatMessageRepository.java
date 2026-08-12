@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> {
@@ -44,6 +45,13 @@ public interface ChatMessageRepository extends JpaRepository<ChatMessage, Long> 
             GROUP BY m.chatChannelId
             """)
     List<Pair<Long, Instant>> findLastMessageByChannel();
+
+    @Query("""
+            SELECT MAX(m.createdAt)
+            FROM ChatMessage m
+            WHERE m.chatChannelId = :chatChannelId
+            """)
+    Optional<Instant> findLastMessageByChannelId(Long chatChannelId);
 
     @Query("""
             SELECT m

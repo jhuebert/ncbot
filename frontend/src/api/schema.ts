@@ -34,7 +34,11 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * Get a channel
+         * @description Fetches a single channel by ID, including its metadata. Returns 400 if not found.
+         */
+        get: operations["getChannel"];
         put?: never;
         post?: never;
         /**
@@ -654,6 +658,36 @@ export interface operations {
                 };
             };
             /** @description Invalid query parameter (e.g., non-integer `page`). */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getChannel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Numeric ID of the channel to fetch. */
+                channelId: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The requested channel. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ChannelDto"];
+                };
+            };
+            /** @description Channel not found. */
             400: {
                 headers: {
                     [name: string]: unknown;

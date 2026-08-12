@@ -105,6 +105,31 @@ paths:
           description: Invalid query parameter (e.g., non-integer `page`).
 
   /v1/channels/{channelId}:
+    get:
+      tags:
+        - Channels
+      summary: Get a channel
+      description: |
+        Fetches a single channel by ID, including its metadata. Returns 400 if not found.
+      operationId: getChannel
+      parameters:
+        - name: channelId
+          in: path
+          required: true
+          description: Numeric ID of the channel to fetch.
+          schema:
+            type: integer
+            format: int64
+            example: 1
+      responses:
+        "200":
+          description: The requested channel.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChannelDto"
+        "400":
+          description: Channel not found.
     delete:
       tags:
         - Channels

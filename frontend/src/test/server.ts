@@ -158,6 +158,14 @@ export const handlers = [
     return HttpResponse.json(pageResponse(mockChannels));
   }),
 
+  http.get("*/v1/channels/:channelId", ({ params }) => {
+    const channel = mockChannels.find((c) => c.id === Number(params.channelId));
+    return HttpResponse.json(
+      channel ?? null,
+      channel ? { status: 200 } : { status: 400 },
+    );
+  }),
+
   http.delete("*/v1/channels/:channelId", () => {
     return new HttpResponse(null, { status: 204 });
   }),

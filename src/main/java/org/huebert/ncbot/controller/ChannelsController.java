@@ -34,6 +34,12 @@ public class ChannelsController {
     }
 
     @DebugLog
+    @GetMapping("/channels/{channelId}")
+    public ChannelDto getChannel(@PathVariable Long channelId) {
+        return channelService.getChannel(channelId);
+    }
+
+    @DebugLog
     @DeleteMapping("/channels/{channelId}")
     public ResponseEntity<Void> deleteChannel(@PathVariable Long channelId) {
         channelService.deleteChannel(channelId);

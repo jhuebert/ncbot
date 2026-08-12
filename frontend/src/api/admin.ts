@@ -116,6 +116,15 @@ export async function deleteChannel(channelId: number): Promise<void> {
   if (error) throw await parseApiError(response);
 }
 
+export async function fetchChannel(channelId: number): Promise<ChannelDto> {
+  const { data, error, response } = await client.GET(
+    "/v1/channels/{channelId}",
+    { params: { path: { channelId } } },
+  );
+  if (error) throw await parseApiError(response);
+  return data as unknown as ChannelDto;
+}
+
 // ── Messages ──
 
 export async function fetchChannelMessages(

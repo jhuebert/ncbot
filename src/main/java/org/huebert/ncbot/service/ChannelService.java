@@ -97,6 +97,15 @@ public class ChannelService {
     }
 
     @DebugLog
+    @Transactional(readOnly = true)
+    public ChannelDto getChannel(Long channelId) {
+        ChatChannel channel = channelRepository.findById(channelId)
+                .orElseThrow(() -> new IllegalArgumentException("Channel not found: " + channelId));
+        Instant lastMessageAt = messageRepository.findLastMessageByChannelId(channelId).orElse(null);
+        return ChannelDto.from(channel, lastMessageAt);
+    }
+
+    @DebugLog
     @Transactional
     public void setMemoryUpdated(Long id) {
         channelRepository.setMemoryUpdated(id, Instant.now());

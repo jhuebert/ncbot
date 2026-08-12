@@ -5,6 +5,7 @@ import {
   useChannelMessages,
   useChannelMemory,
   useChannelParticipants,
+  useChannel,
   useDeleteChannelMemory,
   usePromoteMemory,
   useCreateChannelMemory,
@@ -82,6 +83,7 @@ function formatChatTime(iso: string): string {
 export function ChannelDetailPage() {
   const { channelId } = useParams<{ channelId: string }>();
   const id = Number(channelId);
+  const { data: channel } = useChannel(isNaN(id) ? 0 : id);
   const [tab, setTab] = useStringParam("tab", "messages");
   const isValidTab = (t: string): t is ChannelTab =>
     t === "messages" || t === "memory" || t === "participants";
@@ -104,7 +106,7 @@ export function ChannelDetailPage() {
   }
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="mb-4 flex items-center gap-3">
         <Button
           variant="ghost"
@@ -114,12 +116,19 @@ export function ChannelDetailPage() {
         >
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <h1 className="text-2xl font-bold text-gray-100">Channel #{id}</h1>
+        <h1 className="text-2xl font-bold text-gray-100">
+          Channel #{id}
+          {channel?.channelName && channel.channelName !== "#" + id && (
+            <span className="ml-3 align-middle text-lg font-semibold text-gray-400">
+              {channel.channelName}
+            </span>
+          )}
+        </h1>
       </div>
 
       <ChannelDetailTabs activeTab={currentTab} onChange={(t) => setTab(t)} />
 
-      <div className="mt-4">
+      <div className="mt-4 flex min-h-0 flex-1 flex-col">
         {currentTab === "messages" && <MessagesTab channelId={id} />}
         {currentTab === "memory" && <MemoryTab channelId={id} />}
         {currentTab === "participants" && <ParticipantsTab channelId={id} />}
@@ -160,7 +169,7 @@ function MessagesTab({ channelId }: { channelId: number }) {
   const isEmpty = !isLoading && !error && messages.length === 0;
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <label className="flex items-center gap-1.5 text-sm text-gray-500">
           Before:
@@ -201,7 +210,7 @@ function MessagesTab({ channelId }: { channelId: number }) {
           sentinel="top"
           scrollToBottomOnMount
           loadingLabel="Loading older…"
-          className="max-h-[70vh] rounded-lg border border-gray-800"
+          className="min-h-0 flex-1 rounded-lg border border-gray-800"
         >
         <div className="mx-auto max-w-3xl py-2">
           {items.map((item, i) => {
@@ -293,7 +302,7 @@ function MemoryTab({ channelId }: { channelId: number }) {
   };
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-100">
           Channel Memories
@@ -329,7 +338,7 @@ function MemoryTab({ channelId }: { channelId: number }) {
           onLoadMore={() => fetchNextPage()}
           hasMore={hasNextPage}
           isLoadingMore={isFetchingNextPage}
-          className="max-h-[70vh] rounded-lg border border-gray-800"
+          className="min-h-0 flex-1 rounded-lg border border-gray-800"
         >
         <Table>
           <THead>
@@ -454,7 +463,7 @@ function ParticipantsTab({ channelId }: { channelId: number }) {
   const isEmpty = !isLoading && !error && participants.length === 0;
 
   return (
-    <div>
+    <div className="flex min-h-0 flex-1 flex-col">
       <div className="mb-4 flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-100">
           Channel Participants
@@ -478,7 +487,7 @@ function ParticipantsTab({ channelId }: { channelId: number }) {
           onLoadMore={() => fetchNextPage()}
           hasMore={hasNextPage}
           isLoadingMore={isFetchingNextPage}
-          className="max-h-[70vh] rounded-lg border border-gray-800"
+          className="min-h-0 flex-1 rounded-lg border border-gray-800"
         >
         <Table>
           <THead>
