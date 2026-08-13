@@ -8,28 +8,43 @@ import java.util.regex.Pattern;
 
 public class Truncate {
 
-    private static final Pattern PUNCTUATION_PATTERN = Pattern.compile("[\\p{P}\\p{S}]");
     private static final Pattern EXTRA_WHITESPACE_PATTERN = Pattern.compile("\\s+");
 
+    /**
+     * Trim a string to at most {@code maxBytes} UTF-8 bytes, preserving as much meaning as
+     * possible. Never strips punctuation or tags globally (that mangles $109/<5W/@[tag]);
+     * instead it collapses runs of whitespace and, if still over budget, cuts at the last
+     * whole UTF-8 character/word boundary, appending an ellipsis.
+     */
     public static String truncateUtf8(String text, int maxBytes) {
-
         if (Utf8.encodedLength(text) <= maxBytes) {
             return text;
         }
 
-        text = PUNCTUATION_PATTERN.matcher(text).replaceAll("").trim();
-        if (Utf8.encodedLength(text) <= maxBytes) {
-            return text;
+        // 1) Collapse runs of whitespace first — cheap and meaning-preserving.
+        String compact = EXTRA_WHITESPACE_PATTERN.matcher(text).replaceAll(" ").trim();
+        if (Utf8.encodedLength(compact) <= maxBytes) {
+            return compact;
         }
 
-        text = EXTRA_WHITESPACE_PATTERN.matcher(text).replaceAll(" ").trim();
-        if (Utf8.encodedLength(text) <= maxBytes) {
-            return text;
+        // 2) Otherwise keep as much as fits from the front, ending at a whole UTF-8
+        //    character and a word boundary, then append an ellipsis.
+        byte[] bytes = compact.getBytes(StandardCharsets.UTF_8);
+        int limit = maxBytes - 3; // reserve room for the trailing "..."
+        if (limit <= 0) {
+            return "";
         }
 
-        byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
-        int limit = maxBytes - 3;
-        while ((bytes[limit] & 0xC0) == 0x80) {
+        // Don't split a multi-byte UTF-8 character.
+        while (limit > 0 && limit < bytes.length && (bytes[limit] & 0xC0) == 0x80) {
+            limit--;
+        }
+        // Don't cut mid-word: back up to a whitespace boundary.
+        while (limit > 0 && limit < bytes.length && bytes[limit] != ' ') {
+            limit--;
+        }
+        // Drop the single trailing space that now sits just past the cut.
+        if (limit > 0 && bytes[limit - 1] == ' ') {
             limit--;
         }
 

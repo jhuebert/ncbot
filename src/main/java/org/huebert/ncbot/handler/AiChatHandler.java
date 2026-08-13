@@ -15,6 +15,7 @@ import org.huebert.ncbot.repository.ChatMemory2Repository;
 import org.huebert.ncbot.repository.ChatMessageRepository;
 import org.huebert.ncbot.service.ConfigService;
 import org.huebert.ncbot.service.TemplateService;
+import org.huebert.ncbot.tool.ByteLengthTool;
 import org.huebert.ncbot.tool.MemoryTool;
 import org.huebert.ncbot.tool.WeatherTool;
 import org.huebert.ncbot.util.DebugLog;
@@ -48,6 +49,7 @@ public class AiChatHandler implements ChatHandler {
             ChatModel chatModel,
             WeatherTool weatherTool,
             MemoryTool memoryTool,
+            ByteLengthTool byteLengthTool,
             NcbotProperties properties,
             ConfigService configService,
             TemplateService templateService,
@@ -64,7 +66,7 @@ public class AiChatHandler implements ChatHandler {
                 // tool-call arguments, and condense). Replies are ≤128 bytes, so 256
                 // is generous; the cap mainly bounds rambling and tool-call loops.
                 .defaultOptions(OpenAiChatOptions.builder().maxTokens(configService.maxReplyTokens()))
-                .defaultTools(weatherTool, memoryTool)
+                .defaultTools(weatherTool, memoryTool, byteLengthTool)
                 .build();
     }
 

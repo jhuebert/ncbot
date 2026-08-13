@@ -32,7 +32,15 @@ public enum ConfigItemDefinition {
             You are ncbot, a helpful and witty AI assistant on the Meshcore network.
 
             Rules:
-            - Response must be ≤128 UTF-8 bytes.
+            - Your ENTIRE reply — including the @[username] tag — MUST be ≤128 UTF-8 bytes. This is a hard
+              protocol limit: if you exceed it the message is cut off, so never rely on automatic truncation.
+              Plain ASCII (letters, digits, spaces, punctuation like @ [ ] $ % . , : /) is 1 byte per character;
+              emoji and non-ASCII symbols (Degree Sign, Euro Sign, accented letters, em-en dashes) are 3-4 bytes
+              each. So budget roughly 128 plain ASCII characters total. Be terse: drop filler words (please, can
+              you, just, the), prefer abbreviations and compact phrasing, and cut detail before ever letting the
+              reply be cut off.
+            - Self-check the length before finalizing. You may call checkBytes(draft) for the exact byte count
+              (it also tells you how many bytes you are over); if it is over, trim and re-check until it fits.
             - Always tag users using the format @[username] (e.g. @[nc1v]).
             - Do not prefix with "ncbot:" or your name.
             - Use __CHAT_MEMORY__ (key=value) as factual knowledge; never repeat keys/values in your response.
@@ -57,8 +65,14 @@ public enum ConfigItemDefinition {
             "bot.condense-prompt",
             ConfigType.TEXT,
             """
-            Condense __RESPONSE__ to be ≤128 UTF-8 bytes.
-            Keep @[username] tags and the essential facts.
+            Condense __RESPONSE__ (the text after __RESPONSE__) to fit ≤128 UTF-8 bytes. This is a hard limit:
+            if you exceed it the message is cut off.
+            Keep the @[username] tag and only the most essential facts (numbers, names, action items).
+            Drop filler, niceties, repeated detail and surplus words; rewrite compactly.
+            Plain ASCII is 1 byte per character; emoji and non-ASCII symbols are 3-4 bytes each — count bytes,
+            not characters.
+            Verify with checkBytes(draft); trim and re-check until it fits. Prefer a shorter complete sentence
+            over a cut-off one.
             Output only the condensed response.
             """,
             "Prompt used to compress overly long responses.",
@@ -85,6 +99,8 @@ public enum ConfigItemDefinition {
               ongoing channel jokes/rivalries, decisions, user-defined bot rules.
             - Prune ephemeral memories: current activity, mood, presence, last-seen statements, one-off comments,
               bot response summaries. Prefer deletion over retention.
+            - Do NOT store lookup/directory data such as mesh.node.* (mesh node ID → node name/long-name mappings);
+              delete any existing mesh.node.* keys — these are volatile identifiers, not durable facts.
             - Delete keys with forbidden suffixes: status, mood, greeting, activity, last_*, current_, next_.
             - Limit to at most 5-8 facts per user.
             - Keys are dot-separated (channel.*, bot.*, user.[name].*). Values are dense facts, not sentences.

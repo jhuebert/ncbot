@@ -44,4 +44,21 @@ public class ChatMessage {
     @Column(name = "scoped")
     private Boolean scoped;
 
+    @Override
+    public String toString() {
+        return "ChatMessage{id=" + id +
+                ", chatChannelId=" + chatChannelId +
+                ", senderName='" + senderName + '\'' +
+                ", content='" + truncate(content, 80) + '\'' +
+                ", createdAt=" + createdAt +
+                '}';
+    }
+
+    private static String truncate(String value, int max) {
+        if (value == null || value.length() <= max) {
+            return value;
+        }
+        return value.substring(0, max) + "...";
+    }
+
 }
