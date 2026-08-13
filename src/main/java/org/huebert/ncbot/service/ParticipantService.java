@@ -5,10 +5,12 @@ import org.huebert.ncbot.entity.ChatParticipant;
 import org.huebert.ncbot.repository.ChatMessageRepository;
 import org.huebert.ncbot.repository.ChatParticipantRepository;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -54,6 +56,16 @@ public class ParticipantService {
 
     private static String normalized(String query) {
         return query == null ? null : query.trim();
+    }
+
+    /**
+     * Participants seen in a single channel (derived from that channel's message senders),
+     * most recently active first. Read path for the getChannelParticipants AI tool.
+     */
+    @Transactional(readOnly = true)
+    public List<ChatParticipant> findChannelParticipants(Long channelId, int limit) {
+        return findParticipantsByChannel(channelId, null, PageRequest.of(0, Math.max(1, limit)))
+                .getContent();
     }
 
 }

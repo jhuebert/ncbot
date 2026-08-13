@@ -56,7 +56,11 @@ org.huebert.ncbot/
 │       ├── ChannelsChatHandler, HelpChatHandler, PathChatHandler
 │       ├── DiceChatHandler, PingChatHandler, RandomChatHandler, TestChatHandler, UsersChatHandler
 ├── tool/                          # AI tools (@Component + @Tool)
-│   └── WeatherTool.java           # getWeather
+│   ├── WeatherTool.java           # getWeather (current + 7-day forecast)
+│   ├── HistoryTool.java           # getHistory (on-demand channel history/search)
+│   ├── ParticipantTool.java       # getChannelParticipants (who's active in a channel)
+│   ├── ByteLengthTool.java        # checkBytes (answer byte-length)
+│   └── MemoryTool.java            # insert/update/deleteMemory (persist durable facts)
 ├── entity/                        # JPA entities (Lombok)
 │   ├── ChatChannel, ChatMemory, ChatMessage, ChatParticipant, ConfigItem
 ├── repository/                    # JPA repositories

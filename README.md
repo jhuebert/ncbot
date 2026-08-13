@@ -21,6 +21,9 @@ flowchart TD
         CMD --> AIH["AiChatHandler"]
         AIH --> AIS["AI Chat Service (Spring AI)"]
         AIS -->|Tools| T1["getWeather"]
+        AIS -->|Tools| T2["getHistory"]
+        AIS -->|Tools| T3["getChannelParticipants"]
+        AIS -->|Tools| T4["insert/update/deleteMemory"]
         CS --> REPO["Repositories (JPA + SQLite)"]
         REPO --> CM["ChatMessage"]
         REPO --> CHAN["ChatChannel"]
@@ -225,6 +228,8 @@ The AI model has access to these tools:
 | `insertMemory(channelId, key, value)` | Add a new channel memory; fails if the key already exists. A channel memory with the same key as a global one overrides it for that channel. |
 | `updateMemory(channelId, key, value)` | Update an existing channel memory; fails if it does not exist. |
 | `deleteMemory(channelId, key)` | Delete an existing channel memory; fails if it does not exist. |
+| `getHistory(channelId, from?, to?, sender?, term?, limit?)` | Query the raw chat history of a channel on demand — the recent-message block only covers ~30 min, and long-term memory deliberately drops ephemeral content, so this is the way to answer “summarize today”, “what did we discuss about X”, or “what did Alice say”. Returns a JSON array identical in shape to `__CHAT_MESSAGES__` (oldest first: `sender`, `message`, `timestamp`, `age`, `response`). Optional `from`/`to` (ISO-8601 time bounds), `sender` (exact name), `term` (case-insensitive substring of message text), `limit` (default 50, cap 500). |
+| `getChannelParticipants(channelId, limit?)` | List who has been seen in a channel, most recently active first, each with `name` and `lastSeen`. Enables “who’s online/active here?”; note it’s presence/recency, not a live online state. |
 
 The tool/param descriptions tell the model to estimate coordinates from a location name and to judge freshness: chat history is a JSON array (`__CHAT_MESSAGES__`) where each message carries an absolute `timestamp` and a coarse human-readable `age` (e.g. `"age":"2h ago"`), rendered alongside the current `Time:` line, so a time-sensitive claim like weather older than ~15 minutes is treated as stale and triggers a fresh tool call, while fresh data avoids one.
 
