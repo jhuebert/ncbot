@@ -20,13 +20,13 @@ public class ByteLengthTool {
 
     private final ConfigService configService;
 
-    @Tool(description = "Return the exact UTF-8 byte length of a candidate reply and how far over the "
+    @Tool(name = "checkBytes", description = "Return the exact UTF-8 byte length of a candidate reply and how far over the "
             + "hard protocol limit it is. Use this to make sure your FINAL reply fits: draft the full reply, "
             + "call this with the draft, and if it is over, trim words and re-check until it fits. "
             + "Plain ASCII (letters, digits, spaces, punctuation like @ [ ] $ % . , : /) is 1 byte per "
             + "character; emoji and non-ASCII symbols (Degree Sign, Euro Sign, accented letters, em-en dashes) "
             + "are 3-4 bytes each. The returned number is the source of truth — do not guess byte counts.")
-    public ByteLengthResult measure(
+    public ByteLengthResult checkBytes(
             @ToolParam(description = "The candidate reply text to measure — your full drafted response.") String text
     ) {
         int bytes = Utf8.encodedLength(text == null ? "" : text);
