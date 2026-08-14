@@ -40,6 +40,7 @@ org.huebert.ncbot/
 │   ├── ChannelService             # Channel CRUD (delete with cascade)
 │   ├── ChatService                # Orchestrates handler chain
 │   ├── ConfigService              # DB-backed config: seeding, typed reads, validation, channel caps
+│   ├── AiService                  # Forced AI reply (shared by AiChatHandler + AI-invoking commands)
 │   ├── MemoryService              # Scheduled memory synthesis + memory CRUD
 │   ├── ParticipantService         # Participant queries
 │   ├── TemplateService            # jte rendering
@@ -55,6 +56,7 @@ org.huebert.ncbot/
 │   └── command/                   # Individual command handlers
 │       ├── ChannelsChatHandler, HelpChatHandler, PathChatHandler
 │       ├── DiceChatHandler, PingChatHandler, RandomChatHandler, TestChatHandler, UsersChatHandler
+│       ├── WxChatHandler          # wx / weather — AI-invoking weather command
 ├── tool/                          # AI tools (@Component + @Tool)
 │   ├── WeatherTool.java           # getWeather (current + 7-day forecast)
 │   ├── HistoryTool.java           # getHistory (on-demand channel history/search)
@@ -339,6 +341,8 @@ Controllers live in `controller/` package. See `openapi.yml` for the full OpenAP
 2. Define the command pattern as a `Pattern` constant (regex, case-insensitive by convention)
 3. Return a `Map<String, Object>` with a `template` key pointing to a jte template
 4. Add a jte template in `src/main/jte/command/`
+
+To make a command **reply via AI** (works even when the channel's AI mode is disabled or ncbot wasn't tagged), return `Map.of("ai", true)` instead of a `template`. `CommandChatHandler` then routes the reply through `AiService`. An optional `"aiMessage"` string overrides the user's raw text fed to the model — see `WxChatHandler` (`wx`/`weather`).
 
 ### Adding a New Configuration Item
 

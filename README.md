@@ -290,6 +290,7 @@ Commands are per-channel (controlled by the `channels-command` list). They are m
 | `channels` | `c`, `channel` | List of known channels |
 | `dice` | — | Roll a die: `d<sides>` (e.g., `d20`) |
 | `random` | `r`, `rand` | Random float between 0 and 1 |
+| `weather` | `wx` | AI-generated weather reply (optionally with a location, e.g. `wx 68123` or `weather Chicago`). Invokes AI even if the channel's AI mode is disabled or ncbot wasn't tagged. |
 
 ## Database
 

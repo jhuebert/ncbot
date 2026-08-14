@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.huebert.ncbot.dto.ChatRequest;
 import org.huebert.ncbot.entity.ChatChannel;
 import org.huebert.ncbot.handler.command.CommandHandler;
+import org.huebert.ncbot.service.AiService;
 import org.huebert.ncbot.service.ConfigService;
 import org.huebert.ncbot.service.TemplateService;
 import org.huebert.ncbot.util.DebugLog;
@@ -27,6 +28,8 @@ public class CommandChatHandler implements ChatHandler {
     private final ConfigService configService;
 
     private final TemplateService templateService;
+
+    private final AiService aiService;
 
     private final List<CommandHandler> commandHandlers;
 
@@ -55,6 +58,14 @@ public class CommandChatHandler implements ChatHandler {
             if (handlerParams == null) {
                 log.debug("command {} returned a null result", handler.getClass().getSimpleName());
                 continue;
+            }
+
+            if (Boolean.TRUE.equals(handlerParams.get("ai"))) {
+                log.debug("command {} invokes AI", handler.getClass().getSimpleName());
+                Object aiMessage = handlerParams.get("aiMessage");
+                return aiMessage == null
+                        ? aiService.respondToUser(chatChannel, request)
+                        : aiService.respondToUser(chatChannel, request, aiMessage.toString());
             }
 
             Object template = handlerParams.get("template");
